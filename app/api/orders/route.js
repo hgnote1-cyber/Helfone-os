@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+export async function GET() {
+  const { data, error } = await supabaseAdmin
+    .from("ordens")
+    .select("*")
+    .order("numero", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json(data);
+}
+
+export async function POST(req) {
+  const body = await req.json();
+
+  if (!body.cliente?.trim() || !body.aparelho?.trim()) {
+    return NextResponse.json(
+      { error: "Informe cliente e aparelho." },
+      { status: 400 }
+    );
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("ordens")
+    .insert({
+      cliente: body.cliente,
+      telefone: body.telefone || "",
+      aparelho: body.aparelho,
+      defeito: body.defeito || "",
+      senha: body.senha || "",
+      orcamento: body.orcamento || "",
+      tecnico: body.tecnico || "",
+      status: body.status || "avaliacao",
+      obs: body.obs || "",
+      checklist: body.checklist || [],
+      entry_photos: body.entry_photos || [],
+      exit_photos: body.exit_photos || [],
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json(data);
+}
