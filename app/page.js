@@ -189,24 +189,31 @@ export default function Home() {
     setError("");
     setSaving(true);
     try {
+      let res;
       if (current.id) {
-        await fetch(`/api/orders/${current.id}`, {
+        res = await fetch(`/api/orders/${current.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(current),
         });
       } else {
-        await fetch("/api/orders", {
+        res = await fetch("/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(current),
         });
       }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "O servidor recusou o salvamento.");
+        setSaving(false);
+        return;
+      }
       await load();
       setView("list");
       setCurrent(null);
     } catch (e) {
-      setError("Não consegui salvar. Tente de novo.");
+      setError("Não consegui salvar. Confira sua conexão e tente de novo.");
     } finally {
       setSaving(false);
     }
