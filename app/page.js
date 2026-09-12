@@ -320,16 +320,18 @@ function PhotoPicker({ label, photos, onAdd, onRemove, onView, uploading }) {
       </div>
       <div className="grid grid-cols-3 gap-2">
         {photos.map((src, i) => (
-          <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
-            <img
-              src={src}
-              alt=""
-              onClick={() => onView(src)}
-              className="w-full h-full object-cover cursor-pointer"
-            />
+          <div key={i} className="relative aspect-square">
+            <div className="w-full h-full rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
+              <img
+                src={src}
+                alt=""
+                onClick={() => onView(src)}
+                className="w-full h-full object-cover cursor-pointer"
+              />
+            </div>
             <button
               onClick={() => onRemove(i)}
-              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-zinc-950/80 text-zinc-200 text-xs leading-5"
+              className="absolute -top-1.5 -right-1.5 w-8 h-8 rounded-full bg-red-600 text-white text-lg leading-8 shadow-lg border-2 border-zinc-950"
             >
               ×
             </button>
