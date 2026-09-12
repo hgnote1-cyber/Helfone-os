@@ -124,6 +124,82 @@ function exportCsv(orders) {
   URL.revokeObjectURL(url);
 }
 
+function printCustomerReceipt(order) {
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
+    return;
+  }
+  const checklistHtml = (order.checklist || [])
+    .map((c) => `<div class="item">[${c.checked ? "x" : " "}] ${c.label}</div>`)
+    .join("");
+  const dataEntrada = order.created_at
+    ? new Date(order.created_at).toLocaleDateString("pt-BR")
+    : new Date().toLocaleDateString("pt-BR");
+  win.document.write(`
+    <html>
+    <head>
+      <title>OS #${order.numero} - Via do cliente</title>
+      <meta charset="utf-8" />
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; max-width: 480px; }
+        h1 { font-size: 18px; margin: 0 0 2px; }
+        .store { font-size: 12px; color: #666; margin-bottom: 18px; }
+        .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
+        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px; }
+        .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
+        .item { font-size: 13px; }
+        .terms { font-size: 11px; color: #555; margin: 18px 0; line-height: 1.5; }
+        .sign { margin-top: 40px; }
+        .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 12px; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <h1>Helfone - Assistência Técnica e Acessórios</h1>
+      <div class="store">Higienópolis, São Paulo &middot; OS #${order.numero} &middot; ${dataEntrada}</div>
+
+      <div class="section">
+        <div class="label">Cliente</div>
+        <div>${order.cliente || ""}</div>
+        <div>${order.telefone || ""}</div>
+        ${order.cpf ? `<div>CPF: ${order.cpf}</div>` : ""}
+      </div>
+
+      <div class="section">
+        <div class="label">Aparelho</div>
+        <div>${order.aparelho || ""}</div>
+      </div>
+
+      <div class="section">
+        <div class="label">Defeito relatado</div>
+        <div>${(order.defeito || "-").replace(/\n/g, "<br/>")}</div>
+      </div>
+
+      <div class="section">
+        <div class="label">Condição na entrada (checklist)</div>
+        ${checklistHtml || "-"}
+      </div>
+
+      <div class="section" style="border-bottom:none;">
+        <div class="row"><span>Orçamento previsto</span><span>R$ ${order.orcamento || "a definir"}</span></div>
+      </div>
+
+      <div class="terms">
+        Declaro estar de acordo com a descrição do aparelho e do defeito relatado acima,
+        bem como com o orçamento previsto informado pela loja.
+      </div>
+
+      <div class="sign">
+        <div class="sign-line">Assinatura do cliente</div>
+      </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 250);
+}
+
 function printOrder(order) {
   const s = statusInfo(order.status);
   const win = window.open("", "_blank");
@@ -505,8 +581,16 @@ export default function Home() {
                 onClick={() => printOrder(current)}
                 className="flex-1 border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
               >
-                Imprimir
+                Imprimir (interno)
               </button>
+              <button
+                onClick={() => printCustomerReceipt(current)}
+                className="flex-1 border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
+              >
+                Via do cliente (assinar)
+              </button>
+            </div>
+            <div className="flex gap-2">
               {waLink ? (
                 <a
                   href={waLink}
