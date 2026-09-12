@@ -33,6 +33,29 @@ export async function PUT(req, { params }) {
 }
 
 export async function DELETE(req, { params }) {
+  const { data: order } = await supabaseAdmin
+    .from("ordens")
+    .select("entry_photos, exit_photos")
+    .eq("id", params.id)
+    .single();
+
+  const allUrls = [...(order?.entry_photos || []), ...(order?.exit_photos || [])];
+  const marker = "/fotos/";
+  const paths = allUrls
+    .map((url) => {
+      const idx = url.indexOf(marker);
+      return idx >= 0 ? url.slice(idx + marker.length) : null;
+    })
+    .filter(Boolean);
+
+  if (paths.length > 0) {
+    try {
+      await supabaseAdmin.storage.from("fotos").remove(paths);
+    } catch (e) {
+      // segue mesmo se a limpeza de fotos falhar, pra não travar a exclusão da OS
+    }
+  }
+
   const { error } = await supabaseAdmin.from("ordens").delete().eq("id", params.id);
 
   if (error) {
