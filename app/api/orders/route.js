@@ -28,6 +28,7 @@ export async function POST(req) {
     .insert({
       cliente: body.cliente,
       telefone: body.telefone || "",
+      cpf: body.cpf || "",
       aparelho: body.aparelho,
       defeito: body.defeito || "",
       senha: body.senha || "",
@@ -38,6 +39,7 @@ export async function POST(req) {
       checklist: body.checklist || [],
       entry_photos: body.entry_photos || [],
       exit_photos: body.exit_photos || [],
+      status_history: body.status_history || [],
     })
     .select()
     .single();
