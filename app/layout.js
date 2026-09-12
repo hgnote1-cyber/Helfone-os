@@ -4,6 +4,10 @@ export const metadata = {
   title: "Helfone - Ordens de Serviço",
   description: "Controle de ordens de serviço da Helfone",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport = {
