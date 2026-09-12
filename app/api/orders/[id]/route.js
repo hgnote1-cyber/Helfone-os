@@ -9,6 +9,7 @@ export async function PUT(req, { params }) {
     .update({
       cliente: body.cliente,
       telefone: body.telefone || "",
+      cpf: body.cpf || "",
       aparelho: body.aparelho,
       defeito: body.defeito || "",
       senha: body.senha || "",
@@ -19,6 +20,7 @@ export async function PUT(req, { params }) {
       checklist: body.checklist || [],
       entry_photos: body.entry_photos || [],
       exit_photos: body.exit_photos || [],
+      status_history: body.status_history || [],
     })
     .eq("id", params.id)
     .select()
@@ -28,4 +30,13 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json(data);
+}
+
+export async function DELETE(req, { params }) {
+  const { error } = await supabaseAdmin.from("ordens").delete().eq("id", params.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
 }
