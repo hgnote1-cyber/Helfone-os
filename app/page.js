@@ -160,12 +160,9 @@ function buildReceiptText(order, variant) {
     lines.push("Declaro estar de acordo com os");
     lines.push("dados e orcamento acima.");
     lines.push("");
-    lines.push("");
     lines.push("Assinatura:");
     lines.push("______________________");
   }
-  lines.push("");
-  lines.push("");
   return lines.join("\n");
 }
 
