@@ -124,7 +124,38 @@ function exportCsv(orders) {
   URL.revokeObjectURL(url);
 }
 
-function printCustomerReceipt(order) {
+function paperCss(size) {
+  if (size === "80mm") {
+    return `
+      @page { size: 80mm auto; margin: 2mm; }
+      body { width: 76mm; font-size: 11px; padding: 0; }
+      h1 { font-size: 13px; }
+      .store, .muted { font-size: 9px; }
+      .label { font-size: 8px; }
+      .row, .item { font-size: 11px; }
+      .terms { font-size: 9px; }
+      .sign-line { margin-top: 22px !important; font-size: 10px; }
+    `;
+  }
+  if (size === "58mm") {
+    return `
+      @page { size: 58mm auto; margin: 2mm; }
+      body { width: 54mm; font-size: 10px; padding: 0; }
+      h1 { font-size: 11px; }
+      .store, .muted { font-size: 8px; }
+      .label { font-size: 7px; }
+      .row, .item { font-size: 10px; }
+      .terms { font-size: 8px; }
+      .sign-line { margin-top: 16px !important; font-size: 9px; }
+    `;
+  }
+  return `
+    @page { size: A4; margin: 15mm; }
+    body { max-width: 480px; padding: 24px; }
+  `;
+}
+
+function printCustomerReceipt(order, size = "a4") {
   const win = window.open("", "_blank");
   if (!win) {
     alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
@@ -142,7 +173,7 @@ function printCustomerReceipt(order) {
       <title>OS #${order.numero} - Via do cliente</title>
       <meta charset="utf-8" />
       <style>
-        body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; max-width: 480px; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
         h1 { font-size: 18px; margin: 0 0 2px; }
         .store { font-size: 12px; color: #666; margin-bottom: 18px; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
@@ -152,6 +183,7 @@ function printCustomerReceipt(order) {
         .terms { font-size: 11px; color: #555; margin: 18px 0; line-height: 1.5; }
         .sign { margin-top: 40px; }
         .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 12px; text-align: center; }
+        ${paperCss(size)}
       </style>
     </head>
     <body>
@@ -200,7 +232,7 @@ function printCustomerReceipt(order) {
   setTimeout(() => win.print(), 250);
 }
 
-function printOrder(order) {
+function printOrder(order, size = "a4") {
   const s = statusInfo(order.status);
   const win = window.open("", "_blank");
   if (!win) {
@@ -216,13 +248,14 @@ function printOrder(order) {
       <title>OS #${order.numero}</title>
       <meta charset="utf-8" />
       <style>
-        body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; max-width: 480px; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
         h1 { font-size: 18px; margin: 0 0 2px; }
         .muted { color: #666; font-size: 13px; margin-bottom: 18px; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
         .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px; }
         .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
         .item { font-size: 13px; }
+        ${paperCss(size)}
       </style>
     </head>
     <body>
@@ -340,6 +373,7 @@ export default function Home() {
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [hideDelivered, setHideDelivered] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [printChoice, setPrintChoice] = useState(null);
   const initialStatusRef = useRef(null);
   const originRef = useRef("");
 
@@ -579,13 +613,13 @@ export default function Home() {
           <div className="px-4 pt-3 space-y-2">
             <div className="flex gap-2">
               <button
-                onClick={() => printOrder(current)}
+                onClick={() => setPrintChoice("interno")}
                 className="flex-1 border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
               >
                 Imprimir (interno)
               </button>
               <button
-                onClick={() => printCustomerReceipt(current)}
+                onClick={() => setPrintChoice("cliente")}
                 className="flex-1 border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
               >
                 Via do cliente (assinar)
@@ -815,6 +849,43 @@ export default function Home() {
             />
           </section>
         </div>
+
+        {printChoice && (
+          <div
+            onClick={() => setPrintChoice(null)}
+            className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-zinc-900 border-t border-zinc-800 rounded-t-2xl p-4 space-y-2"
+            >
+              <p className="text-sm text-zinc-400 text-center mb-2">Imprimir em qual formato?</p>
+              {[
+                { id: "a4", label: "Folha A4" },
+                { id: "80mm", label: "Térmica 80mm" },
+                { id: "58mm", label: "Térmica 58mm" },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    if (printChoice === "interno") printOrder(current, opt.id);
+                    else printCustomerReceipt(current, opt.id);
+                    setPrintChoice(null);
+                  }}
+                  className="w-full text-center bg-zinc-800 text-zinc-100 text-sm py-2.5 rounded-lg"
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <button
+                onClick={() => setPrintChoice(null)}
+                className="w-full text-center text-zinc-500 text-sm py-2"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
         {viewingPhoto && (
           <div
