@@ -13,7 +13,8 @@ create table if not exists ordens (
   obs text,
   checklist jsonb default '[]',
   entry_photos jsonb default '[]',
-  exit_photos jsonb default '[]'
+  exit_photos jsonb default '[]',
+  status_history jsonb default '[]'
 );
 
 alter table ordens enable row level security;
