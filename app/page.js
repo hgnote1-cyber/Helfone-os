@@ -124,6 +124,57 @@ function exportCsv(orders) {
   URL.revokeObjectURL(url);
 }
 
+function buildReceiptText(order, variant) {
+  const sep = "--------------------------------";
+  const lines = [];
+  lines.push("HELFONE");
+  lines.push("Assist. Tecnica e Acessorios");
+  lines.push(sep);
+  lines.push(`OS #${order.numero}`);
+  if (variant === "interno") {
+    lines.push(`Status: ${statusInfo(order.status).label}`);
+  }
+  lines.push(sep);
+  lines.push("CLIENTE");
+  lines.push(order.cliente || "");
+  if (order.telefone) lines.push(order.telefone);
+  if (order.cpf) lines.push(`CPF: ${order.cpf}`);
+  lines.push(sep);
+  lines.push("APARELHO");
+  lines.push(order.aparelho || "");
+  lines.push(order.defeito || "");
+  lines.push(sep);
+  lines.push("CHECKLIST");
+  (order.checklist || []).forEach((c) => {
+    lines.push(`[${c.checked ? "x" : " "}] ${c.label}`);
+  });
+  lines.push(sep);
+  lines.push(`Orcamento: R$ ${order.orcamento || "-"}`);
+  if (variant === "interno") {
+    lines.push(`Tecnico: ${order.tecnico || "-"}`);
+    lines.push(sep);
+    lines.push("OBS:");
+    lines.push(order.obs || "-");
+  } else {
+    lines.push(sep);
+    lines.push("Declaro estar de acordo com os");
+    lines.push("dados e orcamento acima.");
+    lines.push("");
+    lines.push("");
+    lines.push("Assinatura:");
+    lines.push("______________________");
+  }
+  lines.push("");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function printThermalDirect(order, variant) {
+  const text = buildReceiptText(order, variant);
+  const b64 = btoa(unescape(encodeURIComponent(text)));
+  window.location.href = `rawbt:base64,${b64}`;
+}
+
 function paperCss(size) {
   if (size === "80mm") {
     return `
@@ -866,12 +917,18 @@ export default function Home() {
                 { id: "a4", label: "Folha A4" },
                 { id: "80mm", label: "Térmica 80mm" },
                 { id: "58mm", label: "Térmica 58mm" },
+                { id: "rawbt", label: "Direto na térmica (RawBT, sem escolher)" },
               ].map((opt) => (
                 <button
                   key={opt.id}
                   onClick={() => {
-                    if (printChoice === "interno") printOrder(current, opt.id);
-                    else printCustomerReceipt(current, opt.id);
+                    if (opt.id === "rawbt") {
+                      printThermalDirect(current, printChoice);
+                    } else if (printChoice === "interno") {
+                      printOrder(current, opt.id);
+                    } else {
+                      printCustomerReceipt(current, opt.id);
+                    }
                     setPrintChoice(null);
                   }}
                   className="w-full text-center bg-zinc-800 text-zinc-100 text-sm py-2.5 rounded-lg"
