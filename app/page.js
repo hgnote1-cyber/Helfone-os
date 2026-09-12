@@ -677,14 +677,14 @@ export default function Home() {
             </div>
             <div className="flex gap-2">
               {waLink ? (
-                <a
-                  href={waLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => {
+                    window.location.href = waLink;
+                  }}
                   className="flex-1 text-center bg-emerald-600 text-white text-sm py-2 rounded-lg"
                 >
                   Avisar por WhatsApp
-                </a>
+                </button>
               ) : (
                 <button
                   disabled
