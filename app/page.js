@@ -552,6 +552,7 @@ export default function Home() {
   if (view === "form" && current) {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-10">
+        <div className="max-w-2xl mx-auto">
         <div className="sticky top-0 bg-zinc-950 border-b border-zinc-800 px-4 py-3 flex items-center gap-3 z-10">
           <button
             onClick={() => {
@@ -829,12 +830,14 @@ export default function Home() {
             </button>
           </div>
         )}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="max-w-2xl mx-auto">
       <div className="sticky top-0 bg-zinc-950 border-b border-zinc-800 px-4 pt-4 pb-3 z-10">
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-lg font-medium">Ordens de serviço</h1>
@@ -971,6 +974,7 @@ export default function Home() {
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );
