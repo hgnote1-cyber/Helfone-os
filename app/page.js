@@ -37,6 +37,7 @@ function emptyOrder() {
     numero: 0,
     cliente: "",
     telefone: "",
+    cpf: "",
     aparelho: "",
     defeito: "",
     senha: "",
@@ -47,6 +48,7 @@ function emptyOrder() {
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c, id: uid() })),
     entry_photos: [],
     exit_photos: [],
+    status_history: [],
   };
 }
 
@@ -79,7 +81,114 @@ function compressImage(file, maxDim = 900, quality = 0.6) {
   });
 }
 
-function PhotoPicker({ label, photos, onAdd, onRemove, uploading }) {
+function formatCpf(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  const p1 = digits.slice(0, 3);
+  const p2 = digits.slice(3, 6);
+  const p3 = digits.slice(6, 9);
+  const p4 = digits.slice(9, 11);
+  let out = p1;
+  if (p2) out += "." + p2;
+  if (p3) out += "." + p3;
+  if (p4) out += "-" + p4;
+  return out;
+}
+
+function whatsappLink(order, origin) {
+  const s = statusInfo(order.status);
+  const digits = (order.telefone || "").replace(/\D/g, "");
+  if (!digits) return null;
+  const withCountry = digits.length <= 11 ? `55${digits}` : digits;
+  const trackUrl = origin && order.id ? `${origin}/acompanhar/${order.id}` : "";
+  const msg = `Olá ${order.cliente || ""}! Sobre o seu ${order.aparelho || "aparelho"} (OS #${order.numero}): status atual é "${s.label}".${
+    trackUrl ? ` Acompanhe por aqui: ${trackUrl}` : ""
+  }`;
+  return `https://wa.me/${withCountry}?text=${encodeURIComponent(msg)}`;
+}
+
+function exportCsv(orders) {
+  const headers = ["numero", "cliente", "telefone", "cpf", "aparelho", "defeito", "status", "orcamento", "tecnico", "criado_em"];
+  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = orders.map((o) =>
+    [o.numero, o.cliente, o.telefone, o.cpf, o.aparelho, o.defeito, statusInfo(o.status).label, o.orcamento, o.tecnico, o.created_at]
+      .map(escape)
+      .join(",")
+  );
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ordens-helfone-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function printOrder(order) {
+  const s = statusInfo(order.status);
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
+    return;
+  }
+  const checklistHtml = (order.checklist || [])
+    .map((c) => `<div class="item">[${c.checked ? "x" : " "}] ${c.label}</div>`)
+    .join("");
+  win.document.write(`
+    <html>
+    <head>
+      <title>OS #${order.numero}</title>
+      <meta charset="utf-8" />
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; max-width: 480px; }
+        h1 { font-size: 18px; margin: 0 0 2px; }
+        .muted { color: #666; font-size: 13px; margin-bottom: 18px; }
+        .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
+        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px; }
+        .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
+        .item { font-size: 13px; }
+      </style>
+    </head>
+    <body>
+      <h1>Helfone - Ordem de Serviço #${order.numero}</h1>
+      <div class="muted">Status: ${s.label}</div>
+
+      <div class="section">
+        <div class="label">Cliente</div>
+        <div>${order.cliente || ""}</div>
+        <div>${order.telefone || ""}</div>
+        ${order.cpf ? `<div>CPF: ${order.cpf}</div>` : ""}
+      </div>
+
+      <div class="section">
+        <div class="label">Aparelho</div>
+        <div>${order.aparelho || ""}</div>
+        <div>${(order.defeito || "").replace(/\n/g, "<br/>")}</div>
+      </div>
+
+      <div class="section">
+        <div class="label">Checklist</div>
+        ${checklistHtml || "-"}
+      </div>
+
+      <div class="section">
+        <div class="row"><span>Orçamento</span><span>R$ ${order.orcamento || "-"}</span></div>
+        <div class="row"><span>Técnico</span><span>${order.tecnico || "-"}</span></div>
+      </div>
+
+      <div class="section" style="border-bottom:none;">
+        <div class="label">Observações</div>
+        <div>${(order.obs || "-").replace(/\n/g, "<br/>")}</div>
+      </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 250);
+}
+
+function PhotoPicker({ label, photos, onAdd, onRemove, onView, uploading }) {
   const inputRef = useRef(null);
 
   async function handleFiles(e) {
@@ -103,7 +212,12 @@ function PhotoPicker({ label, photos, onAdd, onRemove, uploading }) {
       <div className="grid grid-cols-3 gap-2">
         {photos.map((src, i) => (
           <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
-            <img src={src} alt="" className="w-full h-full object-cover" />
+            <img
+              src={src}
+              alt=""
+              onClick={() => onView(src)}
+              className="w-full h-full object-cover cursor-pointer"
+            />
             <button
               onClick={() => onRemove(i)}
               className="absolute top-1 right-1 w-5 h-5 rounded-full bg-zinc-950/80 text-zinc-200 text-xs leading-5"
@@ -147,6 +261,15 @@ export default function Home() {
   const [newItemLabel, setNewItemLabel] = useState("");
   const [uploadingEntry, setUploadingEntry] = useState(false);
   const [uploadingExit, setUploadingExit] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState(null);
+  const [hideDelivered, setHideDelivered] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const initialStatusRef = useRef(null);
+  const originRef = useRef("");
+
+  useEffect(() => {
+    originRef.current = window.location.origin;
+  }, []);
 
   async function load() {
     try {
@@ -164,7 +287,9 @@ export default function Home() {
   }, []);
 
   function openNew() {
-    setCurrent(emptyOrder());
+    const fresh = emptyOrder();
+    setCurrent(fresh);
+    initialStatusRef.current = fresh.status;
     setError("");
     setNewItemLabel("");
     setView("form");
@@ -172,6 +297,7 @@ export default function Home() {
 
   function openEdit(order) {
     setCurrent({ ...order });
+    initialStatusRef.current = order.status;
     setError("");
     setNewItemLabel("");
     setView("form");
@@ -186,21 +312,34 @@ export default function Home() {
       setError("Informe o aparelho.");
       return;
     }
+    const statusChanged = current.status !== initialStatusRef.current;
+    if (statusChanged && current.status === "entregue") {
+      const confirmed = window.confirm("Confirma que essa OS foi entregue ao cliente?");
+      if (!confirmed) return;
+    }
     setError("");
     setSaving(true);
     try {
+      const baseHistory = current.status_history || [];
+      const status_history = statusChanged
+        ? [...baseHistory, { status: current.status, at: new Date().toISOString() }]
+        : baseHistory.length > 0
+        ? baseHistory
+        : [{ status: current.status, at: new Date().toISOString() }];
+      const payload = { ...current, status_history };
+
       let res;
       if (current.id) {
         res = await fetch(`/api/orders/${current.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(current),
+          body: JSON.stringify(payload),
         });
       } else {
         res = await fetch("/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(current),
+          body: JSON.stringify(payload),
         });
       }
       const data = await res.json().catch(() => ({}));
@@ -219,12 +358,35 @@ export default function Home() {
     }
   }
 
+  async function deleteOrder() {
+    if (!current?.id) return;
+    const confirmed = window.confirm(`Excluir a OS #${current.numero} definitivamente? Isso não pode ser desfeito.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await fetch(`/api/orders/${current.id}`, { method: "DELETE" });
+      await load();
+      setView("list");
+      setCurrent(null);
+    } catch (e) {
+      setError("Não consegui excluir. Tente de novo.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function setStatusQuick(order, statusId) {
+    if (statusId === order.status) return;
+    if (statusId === "entregue") {
+      const confirmed = window.confirm(`Confirma que a OS #${order.numero} foi entregue ao cliente?`);
+      if (!confirmed) return;
+    }
+    const status_history = [...(order.status_history || []), { status: statusId, at: new Date().toISOString() }];
     try {
       await fetch(`/api/orders/${order.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...order, status: statusId }),
+        body: JSON.stringify({ ...order, status: statusId, status_history }),
       });
       await load();
     } catch (e) {}
@@ -291,19 +453,25 @@ export default function Home() {
 
   const filtered = (orders || []).filter((o) => {
     const matchesFilter = filter === "todos" || o.status === filter;
+    const hiddenByArchive = filter === "todos" && hideDelivered && o.status === "entregue";
     const q = query.trim().toLowerCase();
+    const qDigits = query.replace(/\D/g, "");
     const matchesQuery =
       !q ||
       o.cliente?.toLowerCase().includes(q) ||
       o.aparelho?.toLowerCase().includes(q) ||
-      String(o.numero).includes(q);
-    return matchesFilter && matchesQuery;
+      String(o.numero).includes(q) ||
+      (qDigits && (o.telefone || "").replace(/\D/g, "").includes(qDigits)) ||
+      (qDigits && (o.cpf || "").replace(/\D/g, "").includes(qDigits));
+    return matchesFilter && !hiddenByArchive && matchesQuery;
   });
 
   const counts = STATUS.reduce((acc, s) => {
     acc[s.id] = (orders || []).filter((o) => o.status === s.id).length;
     return acc;
   }, {});
+
+  const waLink = current ? whatsappLink(current, originRef.current) : null;
 
   if (view === "form" && current) {
     return (
@@ -330,6 +498,60 @@ export default function Home() {
           </button>
         </div>
 
+        {current.id && (
+          <div className="px-4 pt-3 space-y-2">
+            <div className="flex gap-2">
+              <button
+                onClick={() => printOrder(current)}
+                className="flex-1 border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
+              >
+                Imprimir
+              </button>
+              {waLink ? (
+                <a
+                  href={waLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-center bg-emerald-600 text-white text-sm py-2 rounded-lg"
+                >
+                  Avisar por WhatsApp
+                </a>
+              ) : (
+                <button
+                  disabled
+                  className="flex-1 border border-zinc-800 text-zinc-600 text-sm py-2 rounded-lg"
+                  title="Preencha o telefone do cliente"
+                >
+                  Avisar por WhatsApp
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  const url = `${originRef.current}/acompanhar/${current.id}`;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    alert("Link copiado! Envie pro cliente acompanhar o status.");
+                  } catch (e) {
+                    prompt("Copie o link abaixo:", url);
+                  }
+                }}
+                className="flex-1 border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
+              >
+                Copiar link do cliente
+              </button>
+              <button
+                onClick={deleteOrder}
+                disabled={deleting}
+                className="flex-1 border border-red-900 text-red-400 text-sm py-2 rounded-lg disabled:opacity-50"
+              >
+                {deleting ? "Excluindo…" : "Excluir OS"}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="p-4 space-y-5">
           {error && (
             <div className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
@@ -346,9 +568,16 @@ export default function Home() {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
             <input
-              placeholder="Telefone"
+              placeholder="Telefone (com DDD)"
               value={current.telefone}
               onChange={(e) => setCurrent({ ...current, telefone: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+            />
+            <input
+              placeholder="CPF (opcional)"
+              inputMode="numeric"
+              value={current.cpf}
+              onChange={(e) => setCurrent({ ...current, cpf: formatCpf(e.target.value) })}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
           </section>
@@ -431,6 +660,7 @@ export default function Home() {
             photos={current.entry_photos}
             uploading={uploadingEntry}
             onAdd={addEntryPhoto}
+            onView={setViewingPhoto}
             onRemove={(i) =>
               setCurrent({ ...current, entry_photos: current.entry_photos.filter((_, idx) => idx !== i) })
             }
@@ -441,6 +671,7 @@ export default function Home() {
             photos={current.exit_photos}
             uploading={uploadingExit}
             onAdd={addExitPhoto}
+            onView={setViewingPhoto}
             onRemove={(i) =>
               setCurrent({ ...current, exit_photos: current.exit_photos.filter((_, idx) => idx !== i) })
             }
@@ -477,6 +708,19 @@ export default function Home() {
                 ))}
               </select>
             </div>
+            {current.status_history?.length > 0 && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 space-y-1">
+                <p className="text-xs text-zinc-500">Histórico</p>
+                {current.status_history.map((h, i) => (
+                  <div key={i} className="flex justify-between text-xs text-zinc-400">
+                    <span>{statusInfo(h.status).label}</span>
+                    <span className="text-zinc-600">
+                      {h.at ? new Date(h.at).toLocaleString("pt-BR") : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               placeholder="Observações internas"
               value={current.obs}
@@ -486,6 +730,21 @@ export default function Home() {
             />
           </section>
         </div>
+
+        {viewingPhoto && (
+          <div
+            onClick={() => setViewingPhoto(null)}
+            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          >
+            <img src={viewingPhoto} alt="" className="max-w-full max-h-full rounded-lg object-contain" />
+            <button
+              onClick={() => setViewingPhoto(null)}
+              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-zinc-900 text-zinc-200 text-xl"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -495,19 +754,44 @@ export default function Home() {
       <div className="sticky top-0 bg-zinc-950 border-b border-zinc-800 px-4 pt-4 pb-3 z-10">
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-lg font-medium">Ordens de serviço</h1>
-          <button
-            onClick={openNew}
-            className="bg-amber-500 text-zinc-950 text-sm font-medium px-3 py-1.5 rounded-lg"
-          >
-            + Nova OS
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openNew}
+              className="bg-amber-500 text-zinc-950 text-sm font-medium px-3 py-1.5 rounded-lg"
+            >
+              + Nova OS
+            </button>
+            <button
+              onClick={async () => {
+                await fetch("/api/logout", { method: "POST" });
+                window.location.href = "/login";
+              }}
+              className="text-zinc-600 text-xs px-2"
+            >
+              Sair
+            </button>
+          </div>
         </div>
         <input
-          placeholder="Buscar por cliente, aparelho ou número"
+          placeholder="Buscar por cliente, aparelho, telefone, CPF ou número"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500 mb-3"
         />
+        <div className="flex items-center justify-between mb-2">
+          <label className="flex items-center gap-2 text-xs text-zinc-500">
+            <input
+              type="checkbox"
+              checked={!hideDelivered}
+              onChange={(e) => setHideDelivered(!e.target.checked)}
+              className="accent-amber-500"
+            />
+            Mostrar entregues
+          </label>
+          <button onClick={() => exportCsv(orders || [])} className="text-xs text-zinc-500 underline">
+            Exportar CSV
+          </button>
+        </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
           <button
             onClick={() => setFilter("todos")}
