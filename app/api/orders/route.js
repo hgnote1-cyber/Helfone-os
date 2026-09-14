@@ -30,6 +30,7 @@ export async function POST(req) {
       telefone: body.telefone || "",
       cpf: body.cpf || "",
       aparelho: body.aparelho,
+      imei: body.imei || "",
       defeito: body.defeito || "",
       senha: body.senha || "",
       orcamento: body.orcamento || "",
