@@ -94,11 +94,22 @@ function formatCpf(value) {
   return out;
 }
 
+function normalizePhoneBR(raw) {
+  let digits = (raw || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("0")) {
+    digits = digits.replace(/^0+/, "");
+  }
+  if (digits.startsWith("55") && digits.length > 11) {
+    return digits;
+  }
+  return `55${digits}`;
+}
+
 function whatsappLink(order, origin) {
   const s = statusInfo(order.status);
-  const digits = (order.telefone || "").replace(/\D/g, "");
-  if (!digits) return null;
-  const withCountry = digits.length <= 11 ? `55${digits}` : digits;
+  const withCountry = normalizePhoneBR(order.telefone);
+  if (!withCountry) return null;
   const trackUrl = origin && order.id ? `${origin}/acompanhar/${order.id}` : "";
   const msg = `Olá ${order.cliente || ""}! Sobre o seu ${order.aparelho || "aparelho"} (OS #${order.numero}): status atual é "${s.label}".${
     trackUrl ? ` Acompanhe por aqui: ${trackUrl}` : ""
