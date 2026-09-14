@@ -43,6 +43,10 @@ function emptyOrder() {
     defeito: "",
     senha: "",
     orcamento: "",
+    forma_pagamento: "",
+    valor_pago: "",
+    garantia_dias: "90",
+    data_pagamento: "",
     tecnico: "",
     status: "avaliacao",
     obs: "",
@@ -179,10 +183,112 @@ function buildReceiptText(order, variant) {
   return lines.join("\n");
 }
 
+const PAGAMENTO_LABELS = {
+  dinheiro: "Dinheiro",
+  pix: "Pix",
+  debito: "Cartão débito",
+  credito: "Cartão crédito",
+};
+
+function buildPaymentReceiptText(order) {
+  const sep = "--------------------------------";
+  const lines = [];
+  lines.push("HELFONE");
+  lines.push("Assist. Tecnica e Acessorios");
+  lines.push(sep);
+  lines.push("CUPOM DE PAGAMENTO");
+  lines.push(`OS #${order.numero}`);
+  const dataPagto = order.data_pagamento
+    ? new Date(order.data_pagamento).toLocaleDateString("pt-BR")
+    : new Date().toLocaleDateString("pt-BR");
+  lines.push(`Data: ${dataPagto}`);
+  lines.push(sep);
+  lines.push("CLIENTE");
+  lines.push(order.cliente || "");
+  if (order.telefone) lines.push(order.telefone);
+  lines.push(sep);
+  lines.push("APARELHO");
+  lines.push(order.aparelho || "");
+  lines.push(sep);
+  lines.push(`Valor pago: R$ ${order.valor_pago || "-"}`);
+  lines.push(`Forma de pagamento: ${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}`);
+  lines.push(sep);
+  lines.push(`Garantia do servico: ${order.garantia_dias || "90"} dias`);
+  lines.push("a partir da data desta retirada,");
+  lines.push("cobrindo o defeito reparado.");
+  lines.push("");
+  lines.push("Obrigado pela preferencia!");
+  return lines.join("\n");
+}
+
 function printThermalDirect(order, variant) {
-  const text = buildReceiptText(order, variant);
+  const text =
+    variant === "pagamento" ? buildPaymentReceiptText(order) : buildReceiptText(order, variant);
   const b64 = btoa(unescape(encodeURIComponent(text)));
   window.location.href = `rawbt:base64,${b64}`;
+}
+
+function printPaymentReceipt(order, size = "a4") {
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
+    return;
+  }
+  const dataPagto = order.data_pagamento
+    ? new Date(order.data_pagamento).toLocaleDateString("pt-BR")
+    : new Date().toLocaleDateString("pt-BR");
+  win.document.write(`
+    <html>
+    <head>
+      <title>OS #${order.numero} - Cupom de pagamento</title>
+      <meta charset="utf-8" />
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+        h1 { font-size: 18px; margin: 0 0 2px; }
+        .store { font-size: 12px; color: #666; margin-bottom: 18px; }
+        .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
+        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px; }
+        .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
+        .garantia { font-size: 11px; color: #555; margin-top: 14px; line-height: 1.5; }
+        ${paperCss(size)}
+      </style>
+    </head>
+    <body>
+      <h1>Helfone - Assistência Técnica e Acessórios</h1>
+      <div class="store">Higienópolis, São Paulo &middot; OS #${order.numero} &middot; ${dataPagto}</div>
+
+      <div class="section">
+        <div class="label">Cupom de pagamento</div>
+      </div>
+
+      <div class="section">
+        <div class="label">Cliente</div>
+        <div>${order.cliente || ""}</div>
+        <div>${order.telefone || ""}</div>
+      </div>
+
+      <div class="section">
+        <div class="label">Aparelho</div>
+        <div>${order.aparelho || ""}</div>
+      </div>
+
+      <div class="section" style="border-bottom:none;">
+        <div class="row"><span>Valor pago</span><span>R$ ${order.valor_pago || "-"}</span></div>
+        <div class="row"><span>Forma de pagamento</span><span>${
+          PAGAMENTO_LABELS[order.forma_pagamento] || "-"
+        }</span></div>
+      </div>
+
+      <div class="garantia">
+        Garantia do serviço prestado: <b>${order.garantia_dias || "90"} dias</b> a partir desta data de retirada,
+        cobrindo o defeito reparado nesta ordem de serviço.
+      </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 250);
 }
 
 function paperCss(size) {
@@ -922,6 +1028,62 @@ export default function Home() {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500 resize-none"
             />
           </section>
+
+          {current.id && (
+            <section className="space-y-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">Pagamento (retirada)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  placeholder="Valor pago (R$)"
+                  inputMode="decimal"
+                  value={current.valor_pago}
+                  onChange={(e) => setCurrent({ ...current, valor_pago: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                />
+                <select
+                  value={current.forma_pagamento}
+                  onChange={(e) => setCurrent({ ...current, forma_pagamento: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm"
+                >
+                  <option value="">Forma de pagamento</option>
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="pix">Pix</option>
+                  <option value="debito">Cartão débito</option>
+                  <option value="credito">Cartão crédito</option>
+                </select>
+              </div>
+              <input
+                placeholder="Garantia (dias)"
+                inputMode="numeric"
+                value={current.garantia_dias}
+                onChange={(e) => setCurrent({ ...current, garantia_dias: e.target.value.replace(/[^0-9]/g, "") })}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                onClick={async () => {
+                  if (!current.forma_pagamento || !current.valor_pago) {
+                    setError("Preencha valor e forma de pagamento antes de emitir o cupom.");
+                    return;
+                  }
+                  setError("");
+                  const dataPagamento = current.data_pagamento || new Date().toISOString();
+                  const updated = { ...current, data_pagamento: dataPagamento };
+                  try {
+                    await fetch(`/api/orders/${current.id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(updated),
+                    });
+                    setCurrent(updated);
+                  } catch (e) {}
+                  setPrintChoice("pagamento");
+                }}
+                className="w-full bg-emerald-600 text-white text-sm font-medium py-2.5 rounded-lg"
+              >
+                Emitir cupom de pagamento
+              </button>
+            </section>
+          )}
         </div>
 
         {printChoice && (
@@ -947,6 +1109,8 @@ export default function Home() {
                       printThermalDirect(current, printChoice);
                     } else if (printChoice === "interno") {
                       printOrder(current, opt.id);
+                    } else if (printChoice === "pagamento") {
+                      printPaymentReceipt(current, opt.id);
                     } else {
                       printCustomerReceipt(current, opt.id);
                     }
