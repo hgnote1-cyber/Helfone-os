@@ -140,12 +140,46 @@ function exportCsv(orders) {
   URL.revokeObjectURL(url);
 }
 
+const STORE = {
+  nome: "HELFONE ASSISTENCIA",
+  cnpj: "27.474.624/0001-05",
+  endereco: "Rua Dona Antonia de Queiroz, 439 - Consolação",
+  cidade: "São Paulo",
+  telefone: "(11) 98839-0194",
+  instagram: "@helfone1",
+};
+
+function storeHeaderLines() {
+  const eq = "================================";
+  return [
+    eq,
+    STORE.nome,
+    `CNPJ: ${STORE.cnpj}`,
+    STORE.endereco,
+    STORE.cidade,
+    `Tel/Whats: ${STORE.telefone}`,
+    `Insta: ${STORE.instagram}`,
+    eq,
+  ];
+}
+
+function storeHeaderHtml() {
+  return `
+    <div style="text-align:center; margin-bottom:14px;">
+      <div style="font-weight:bold; font-size:15px;">${STORE.nome}</div>
+      <div>CNPJ: ${STORE.cnpj}</div>
+      <div>${STORE.endereco}</div>
+      <div>${STORE.cidade}</div>
+      <div>Tel/Whats: ${STORE.telefone} | Insta: ${STORE.instagram}</div>
+    </div>
+    <div style="border-top:1px dashed #999; margin-bottom:10px;"></div>
+  `;
+}
+
 function buildReceiptText(order, variant) {
   const sep = "--------------------------------";
   const lines = [];
-  lines.push("HELFONE");
-  lines.push("Assist. Tecnica e Acessorios");
-  lines.push(sep);
+  lines.push(...storeHeaderLines());
   lines.push(`OS #${order.numero}`);
   if (variant === "interno") {
     lines.push(`Status: ${statusInfo(order.status).label}`);
@@ -191,33 +225,30 @@ const PAGAMENTO_LABELS = {
 };
 
 function buildPaymentReceiptText(order) {
-  const sep = "--------------------------------";
+  const eq = "================================";
   const lines = [];
-  lines.push("HELFONE");
-  lines.push("Assist. Tecnica e Acessorios");
-  lines.push(sep);
-  lines.push("CUPOM DE PAGAMENTO");
-  lines.push(`OS #${order.numero}`);
-  const dataPagto = order.data_pagamento
-    ? new Date(order.data_pagamento).toLocaleDateString("pt-BR")
-    : new Date().toLocaleDateString("pt-BR");
-  lines.push(`Data: ${dataPagto}`);
-  lines.push(sep);
-  lines.push("CLIENTE");
-  lines.push(order.cliente || "");
-  if (order.telefone) lines.push(order.telefone);
-  lines.push(sep);
-  lines.push("APARELHO");
-  lines.push(order.aparelho || "");
-  lines.push(sep);
-  lines.push(`Valor pago: R$ ${order.valor_pago || "-"}`);
-  lines.push(`Forma de pagamento: ${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}`);
-  lines.push(sep);
-  lines.push(`Garantia do servico: ${order.garantia_dias || "90"} dias`);
-  lines.push("a partir da data desta retirada,");
-  lines.push("cobrindo o defeito reparado.");
-  lines.push("");
+  lines.push(...storeHeaderLines());
+  const now = order.data_pagamento ? new Date(order.data_pagamento) : new Date();
+  const dataStr = now.toISOString().slice(0, 10);
+  const horaStr = now.toTimeString().slice(0, 8);
+  lines.push(`Cupom No: ${String(order.numero).padStart(6, "0")}  Data: ${dataStr} ${horaStr}`);
+  lines.push(`Cliente: ${order.cliente || "Cliente Avulso"}`);
+  if (order.tecnico) lines.push(`Operador: ${order.tecnico}`);
+  lines.push(eq);
+  lines.push("CODIGO  DESCRICAO           QTD  SUBTOT");
+  lines.push("--------------------------------");
+  const desc = (order.aparelho || "Servico").slice(0, 18).padEnd(18, " ");
+  lines.push(`OS#${order.numero}  ${desc} 1   R$${order.valor_pago || "-"}`);
+  lines.push("--------------------------------");
+  lines.push(`SUBTOTAL: R$ ${order.valor_pago || "-"}`);
+  lines.push(`TOTAL: R$ ${order.valor_pago || "-"}`);
+  lines.push(`FORMA PAGTO: ${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}`);
+  lines.push(eq);
   lines.push("Obrigado pela preferencia!");
+  lines.push(`Garantia de ${order.garantia_dias || "90"} dias contra defeitos de`);
+  lines.push("fabricacao. Nao cobre mau uso, quedas,");
+  lines.push("umidade ou violacao do produto.");
+  lines.push(eq);
   return lines.join("\n");
 }
 
@@ -234,54 +265,53 @@ function printPaymentReceipt(order, size = "a4") {
     alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
     return;
   }
-  const dataPagto = order.data_pagamento
-    ? new Date(order.data_pagamento).toLocaleDateString("pt-BR")
-    : new Date().toLocaleDateString("pt-BR");
+  const now = order.data_pagamento ? new Date(order.data_pagamento) : new Date();
+  const dataStr = now.toISOString().slice(0, 10);
+  const horaStr = now.toTimeString().slice(0, 8);
   win.document.write(`
     <html>
     <head>
       <title>OS #${order.numero} - Cupom de pagamento</title>
       <meta charset="utf-8" />
       <style>
-        body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
-        h1 { font-size: 18px; margin: 0 0 2px; }
-        .store { font-size: 12px; color: #666; margin-bottom: 18px; }
-        .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px; }
-        .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
-        .garantia { font-size: 11px; color: #555; margin-top: 14px; line-height: 1.5; }
+        body { font-family: "Courier New", monospace; color: #111; margin: 0; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .eq { border-top: 1px dashed #333; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+        td { padding: 2px 0; }
+        .right { text-align: right; }
+        .totals { font-size: 13px; margin-top: 6px; }
+        .totals .row { display: flex; justify-content: space-between; }
+        .garantia { font-size: 11px; margin-top: 14px; line-height: 1.5; text-align: center; }
         ${paperCss(size)}
       </style>
     </head>
     <body>
-      <h1>Helfone - Assistência Técnica e Acessórios</h1>
-      <div class="store">Higienópolis, São Paulo &middot; OS #${order.numero} &middot; ${dataPagto}</div>
+      ${storeHeaderHtml()}
 
-      <div class="section">
-        <div class="label">Cupom de pagamento</div>
-      </div>
+      <div>Cupom No: ${String(order.numero).padStart(6, "0")}&nbsp;&nbsp;Data: ${dataStr} ${horaStr}</div>
+      <div>Cliente: ${order.cliente || "Cliente Avulso"}</div>
+      ${order.tecnico ? `<div>Operador: ${order.tecnico}</div>` : ""}
+      <div class="eq"></div>
 
-      <div class="section">
-        <div class="label">Cliente</div>
-        <div>${order.cliente || ""}</div>
-        <div>${order.telefone || ""}</div>
-      </div>
+      <table>
+        <tr class="bold"><td>Descrição</td><td class="right">Qtd</td><td class="right">Subtotal</td></tr>
+        <tr><td>${order.aparelho || "Serviço"} (OS #${order.numero})</td><td class="right">1</td><td class="right">R$ ${order.valor_pago || "-"}</td></tr>
+      </table>
 
-      <div class="section">
-        <div class="label">Aparelho</div>
-        <div>${order.aparelho || ""}</div>
+      <div class="eq"></div>
+      <div class="totals">
+        <div class="row"><span>SUBTOTAL:</span><span>R$ ${order.valor_pago || "-"}</span></div>
+        <div class="row bold"><span>TOTAL:</span><span>R$ ${order.valor_pago || "-"}</span></div>
+        <div class="row"><span>FORMA PAGTO:</span><span>${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}</span></div>
       </div>
-
-      <div class="section" style="border-bottom:none;">
-        <div class="row"><span>Valor pago</span><span>R$ ${order.valor_pago || "-"}</span></div>
-        <div class="row"><span>Forma de pagamento</span><span>${
-          PAGAMENTO_LABELS[order.forma_pagamento] || "-"
-        }</span></div>
-      </div>
+      <div class="eq"></div>
 
       <div class="garantia">
-        Garantia do serviço prestado: <b>${order.garantia_dias || "90"} dias</b> a partir desta data de retirada,
-        cobrindo o defeito reparado nesta ordem de serviço.
+        Obrigado pela preferência!<br/>
+        Garantia de ${order.garantia_dias || "90"} dias contra defeitos de fabricação.
+        Não cobre mau uso, quedas, umidade ou violação do produto.
       </div>
     </body>
     </html>
@@ -355,7 +385,7 @@ function printCustomerReceipt(order, size = "a4") {
     </head>
     <body>
       <h1>Helfone - Assistência Técnica e Acessórios</h1>
-      <div class="store">Higienópolis, São Paulo &middot; OS #${order.numero} &middot; ${dataEntrada}</div>
+      <div class="store">Rua Dona Antonia de Queiroz, 439 - Consolação, São Paulo &middot; OS #${order.numero} &middot; ${dataEntrada}</div>
 
       <div class="section">
         <div class="label">Cliente</div>
