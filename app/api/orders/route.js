@@ -41,6 +41,10 @@ export async function POST(req) {
       entry_photos: body.entry_photos || [],
       exit_photos: body.exit_photos || [],
       status_history: body.status_history || [],
+      forma_pagamento: body.forma_pagamento || "",
+      valor_pago: body.valor_pago || "",
+      garantia_dias: body.garantia_dias || "90",
+      data_pagamento: body.data_pagamento || null,
     })
     .select()
     .single();
