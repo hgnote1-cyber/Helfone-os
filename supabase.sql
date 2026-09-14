@@ -15,7 +15,11 @@ create table if not exists ordens (
   checklist jsonb default '[]',
   entry_photos jsonb default '[]',
   exit_photos jsonb default '[]',
-  status_history jsonb default '[]'
+  status_history jsonb default '[]',
+  forma_pagamento text,
+  valor_pago text,
+  garantia_dias text default '90',
+  data_pagamento timestamptz
 );
 
 alter table ordens enable row level security;
