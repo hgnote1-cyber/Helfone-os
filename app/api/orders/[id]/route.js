@@ -15,6 +15,7 @@ export async function PUT(req, { params }) {
       defeito: body.defeito || "",
       senha: body.senha || "",
       orcamento: body.orcamento || "",
+      servico: body.servico || "",
       tecnico: body.tecnico || "",
       status: body.status,
       obs: body.obs || "",
