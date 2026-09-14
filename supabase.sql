@@ -9,6 +9,7 @@ create table if not exists ordens (
   defeito text,
   senha text,
   orcamento text,
+  servico text,
   tecnico text,
   status text default 'avaliacao',
   obs text,
