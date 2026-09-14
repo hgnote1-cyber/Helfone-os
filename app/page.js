@@ -1013,7 +1013,7 @@ export default function Home() {
             />
             Mostrar entregues
           </label>
-          <button onClick={() => exportCsv(orders || [])} className="text-xs text-zinc-500 underline">
+          <button onClick={() => exportCsv(filtered)} className="text-xs text-zinc-500 underline">
             Exportar CSV
           </button>
         </div>
