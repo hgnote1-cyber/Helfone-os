@@ -39,6 +39,7 @@ function emptyOrder() {
     telefone: "",
     cpf: "",
     aparelho: "",
+    imei: "",
     defeito: "",
     senha: "",
     orcamento: "",
@@ -118,10 +119,10 @@ function whatsappLink(order, origin) {
 }
 
 function exportCsv(orders) {
-  const headers = ["numero", "cliente", "telefone", "cpf", "aparelho", "defeito", "status", "orcamento", "tecnico", "criado_em"];
+  const headers = ["numero", "cliente", "telefone", "cpf", "aparelho", "imei", "defeito", "status", "orcamento", "tecnico", "criado_em"];
   const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = orders.map((o) =>
-    [o.numero, o.cliente, o.telefone, o.cpf, o.aparelho, o.defeito, statusInfo(o.status).label, o.orcamento, o.tecnico, o.created_at]
+    [o.numero, o.cliente, o.telefone, o.cpf, o.aparelho, o.imei, o.defeito, statusInfo(o.status).label, o.orcamento, o.tecnico, o.created_at]
       .map(escape)
       .join(",")
   );
@@ -153,6 +154,7 @@ function buildReceiptText(order, variant) {
   lines.push(sep);
   lines.push("APARELHO");
   lines.push(order.aparelho || "");
+  if (order.imei) lines.push(`IMEI: ${order.imei}`);
   lines.push(order.defeito || "");
   lines.push(sep);
   lines.push("CHECKLIST");
@@ -259,6 +261,7 @@ function printCustomerReceipt(order, size = "a4") {
       <div class="section">
         <div class="label">Aparelho</div>
         <div>${order.aparelho || ""}</div>
+        ${order.imei ? `<div>IMEI: ${order.imei}</div>` : ""}
       </div>
 
       <div class="section">
@@ -331,6 +334,7 @@ function printOrder(order, size = "a4") {
       <div class="section">
         <div class="label">Aparelho</div>
         <div>${order.aparelho || ""}</div>
+        ${order.imei ? `<div>IMEI: ${order.imei}</div>` : ""}
         <div>${(order.defeito || "").replace(/\n/g, "<br/>")}</div>
       </div>
 
@@ -633,7 +637,8 @@ export default function Home() {
       o.aparelho?.toLowerCase().includes(q) ||
       String(o.numero).includes(q) ||
       (qDigits && (o.telefone || "").replace(/\D/g, "").includes(qDigits)) ||
-      (qDigits && (o.cpf || "").replace(/\D/g, "").includes(qDigits));
+      (qDigits && (o.cpf || "").replace(/\D/g, "").includes(qDigits)) ||
+      (qDigits && (o.imei || "").includes(qDigits));
     return matchesFilter && !hiddenByArchive && matchesQuery;
   });
 
@@ -768,6 +773,14 @@ export default function Home() {
               placeholder="Ex: iPhone 12, Notebook Dell i5"
               value={current.aparelho}
               onChange={(e) => setCurrent({ ...current, aparelho: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+            />
+            <input
+              placeholder="IMEI (só para celulares)"
+              inputMode="numeric"
+              maxLength={17}
+              value={current.imei}
+              onChange={(e) => setCurrent({ ...current, imei: e.target.value.replace(/[^0-9]/g, "") })}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
             <textarea
@@ -998,7 +1011,7 @@ export default function Home() {
           </div>
         </div>
         <input
-          placeholder="Buscar por cliente, aparelho, telefone, CPF ou número"
+          placeholder="Buscar por cliente, aparelho, telefone, CPF, IMEI ou número"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500 mb-3"
