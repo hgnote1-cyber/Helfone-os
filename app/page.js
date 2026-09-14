@@ -43,6 +43,7 @@ function emptyOrder() {
     defeito: "",
     senha: "",
     orcamento: "",
+    servico: "",
     forma_pagamento: "",
     valor_pago: "",
     garantia_dias: "90",
@@ -237,8 +238,10 @@ function buildPaymentReceiptText(order) {
   lines.push(eq);
   lines.push("CODIGO  DESCRICAO           QTD  SUBTOT");
   lines.push("--------------------------------");
-  const desc = (order.aparelho || "Servico").slice(0, 18).padEnd(18, " ");
+  const itemDesc = order.servico || order.aparelho || "Servico";
+  const desc = itemDesc.slice(0, 18).padEnd(18, " ");
   lines.push(`OS#${order.numero}  ${desc} 1   R$${order.valor_pago || "-"}`);
+  if (order.servico && order.aparelho) lines.push(`(${order.aparelho})`);
   lines.push("--------------------------------");
   lines.push(`SUBTOTAL: R$ ${order.valor_pago || "-"}`);
   lines.push(`TOTAL: R$ ${order.valor_pago || "-"}`);
@@ -274,7 +277,7 @@ function printPaymentReceipt(order, size = "a4") {
       <title>OS #${order.numero} - Cupom de pagamento</title>
       <meta charset="utf-8" />
       <style>
-        body { font-family: "Courier New", monospace; color: #111; margin: 0; }
+        body { font-family: "Courier New", monospace; color: #000; margin: 0; font-weight: bold; }
         .center { text-align: center; }
         .bold { font-weight: bold; }
         .eq { border-top: 1px dashed #333; margin: 8px 0; }
@@ -297,7 +300,8 @@ function printPaymentReceipt(order, size = "a4") {
 
       <table>
         <tr class="bold"><td>Descrição</td><td class="right">Qtd</td><td class="right">Subtotal</td></tr>
-        <tr><td>${order.aparelho || "Serviço"} (OS #${order.numero})</td><td class="right">1</td><td class="right">R$ ${order.valor_pago || "-"}</td></tr>
+        <tr><td>${order.servico || order.aparelho || "Serviço"} (OS #${order.numero})</td><td class="right">1</td><td class="right">R$ ${order.valor_pago || "-"}</td></tr>
+        ${order.servico && order.aparelho ? `<tr><td colspan="3" style="font-size:11px; color:#555;">Aparelho: ${order.aparelho}</td></tr>` : ""}
       </table>
 
       <div class="eq"></div>
@@ -1008,6 +1012,12 @@ export default function Home() {
 
           <section className="space-y-3">
             <p className="text-xs uppercase tracking-wide text-zinc-500">Serviço</p>
+            <input
+              placeholder="Serviço realizado (ex: Troca de tela, Troca de bateria)"
+              value={current.servico}
+              onChange={(e) => setCurrent({ ...current, servico: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+            />
             <div className="grid grid-cols-2 gap-3">
               <input
                 placeholder="Orçamento (R$)"
