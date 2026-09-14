@@ -5,6 +5,7 @@ create table if not exists ordens (
   cliente text not null,
   telefone text,
   aparelho text not null,
+  imei text,
   defeito text,
   senha text,
   orcamento text,
