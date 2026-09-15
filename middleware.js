@@ -9,6 +9,7 @@ export function middleware(req) {
     pathname.startsWith("/api/login") ||
     pathname.startsWith("/acompanhar") ||
     pathname.startsWith("/api/track") ||
+    pathname.startsWith("/api/keepalive") ||
     pathname.startsWith("/manifest.json") ||
     pathname.startsWith("/icon-") ||
     pathname.startsWith("/apple-touch-icon") ||
