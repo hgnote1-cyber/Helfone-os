@@ -8,6 +8,7 @@ const STATUS = [
   { id: "conserto", label: "Em conserto", dot: "bg-amber-500", border: "border-l-amber-500", text: "text-amber-400" },
   { id: "pronto", label: "Pronto", dot: "bg-emerald-500", border: "border-l-emerald-500", text: "text-emerald-400" },
   { id: "entregue", label: "Entregue", dot: "bg-zinc-600", border: "border-l-zinc-700", text: "text-zinc-500" },
+  { id: "cancelado", label: "Cancelado", dot: "bg-red-500", border: "border-l-red-500", text: "text-red-400" },
 ];
 
 const DEFAULT_CHECKLIST = [
@@ -45,6 +46,7 @@ function emptyOrder() {
     orcamento: "",
     servico: "",
     itens_servico: [],
+    orcamento_aprovado: false,
     forma_pagamento: "",
     valor_pago: "",
     garantia_dias: "90",
@@ -692,6 +694,10 @@ export default function Home() {
       const confirmed = window.confirm("Confirma que essa OS foi entregue ao cliente?");
       if (!confirmed) return;
     }
+    if (statusChanged && current.status === "cancelado") {
+      const confirmed = window.confirm("Confirma o cancelamento desta OS?");
+      if (!confirmed) return;
+    }
     setError("");
     setSaving(true);
     try {
@@ -754,6 +760,10 @@ export default function Home() {
     if (statusId === order.status) return;
     if (statusId === "entregue") {
       const confirmed = window.confirm(`Confirma que a OS #${order.numero} foi entregue ao cliente?`);
+      if (!confirmed) return;
+    }
+    if (statusId === "cancelado") {
+      const confirmed = window.confirm(`Confirma o cancelamento da OS #${order.numero}?`);
       if (!confirmed) return;
     }
     const status_history = [...(order.status_history || []), { status: statusId, at: new Date().toISOString() }];
@@ -900,7 +910,8 @@ export default function Home() {
 
   const filtered = (orders || []).filter((o) => {
     const matchesFilter = filter === "todos" || o.status === filter;
-    const hiddenByArchive = filter === "todos" && hideDelivered && o.status === "entregue";
+    const hiddenByArchive =
+      filter === "todos" && hideDelivered && (o.status === "entregue" || o.status === "cancelado");
     const q = query.trim().toLowerCase();
     const qDigits = query.replace(/\D/g, "");
     const matchesQuery =
@@ -1208,6 +1219,15 @@ export default function Home() {
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
               />
             </div>
+            <label className="flex items-center gap-2.5 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={current.orcamento_aprovado}
+                onChange={(e) => setCurrent({ ...current, orcamento_aprovado: e.target.checked })}
+                className="accent-emerald-500 w-4 h-4"
+              />
+              <span className="text-sm text-zinc-300">Cliente aprovou o orçamento</span>
+            </label>
             <div>
               <label className="text-xs text-zinc-500 block mb-1">Status</label>
               <select
@@ -1436,7 +1456,7 @@ export default function Home() {
               onChange={(e) => setHideDelivered(!e.target.checked)}
               className="accent-amber-500"
             />
-            Mostrar entregues
+            Mostrar entregues/canceladas
           </label>
           <div className="flex items-center gap-3">
             <button onClick={() => setShowDashboard(true)} className="text-xs text-zinc-500 underline">
@@ -1517,6 +1537,9 @@ export default function Home() {
                 </div>
                 <p className="text-sm font-medium">{o.cliente}</p>
                 <p className="text-xs text-zinc-500">{o.aparelho}</p>
+                {o.orcamento_aprovado && (
+                  <p className="text-xs text-emerald-400">✓ Orçamento aprovado</p>
+                )}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-500">
                   {o.orcamento && <span>Orçamento: R$ {o.orcamento}</span>}
                   {totalCount > 0 && (
