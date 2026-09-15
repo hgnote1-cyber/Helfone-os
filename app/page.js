@@ -44,6 +44,7 @@ function emptyOrder() {
     senha: "",
     orcamento: "",
     servico: "",
+    itens_servico: [],
     forma_pagamento: "",
     valor_pago: "",
     garantia_dias: "90",
@@ -229,26 +230,48 @@ const PAGAMENTO_LABELS = {
   credito: "Cartão crédito",
 };
 
+function formatDateBR(date) {
+  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const y = date.getFullYear();
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return { data: `${d}/${m}/${y}`, hora: `${h}:${min}` };
+}
+
+function itensComTotal(order) {
+  const itens = (order.itens_servico || []).filter((it) => it.descricao || it.preco);
+  if (itens.length > 0) {
+    const total = itens.reduce((sum, it) => sum + (parseFloat(String(it.preco).replace(",", ".")) || 0), 0);
+    return { itens, total: total.toFixed(2).replace(".", ",") };
+  }
+  return {
+    itens: [{ descricao: order.servico || order.aparelho || "Serviço", preco: order.valor_pago || "0" }],
+    total: order.valor_pago || "-",
+  };
+}
+
 function buildPaymentReceiptText(order) {
   const eq = "================================";
   const lines = [];
   lines.push(...storeHeaderLines());
   const now = order.data_pagamento ? new Date(order.data_pagamento) : new Date();
-  const dataStr = now.toISOString().slice(0, 10);
-  const horaStr = now.toTimeString().slice(0, 8);
-  lines.push(`Cupom No: ${String(order.numero).padStart(6, "0")}  Data: ${dataStr} ${horaStr}`);
+  const { data: dataStr, hora: horaStr } = formatDateBR(now);
+  lines.push(`Cupom No: ${order.numero}  Data: ${dataStr} ${horaStr}`);
   lines.push(`Cliente: ${order.cliente || "Cliente Avulso"}`);
   if (order.tecnico) lines.push(`Operador: ${order.tecnico}`);
   lines.push(eq);
-  lines.push("CODIGO  DESCRICAO           QTD  SUBTOT");
+  lines.push("DESCRICAO           QTD  SUBTOT");
   lines.push("--------------------------------");
-  const itemDesc = order.servico || order.aparelho || "Servico";
-  const desc = itemDesc.slice(0, 18).padEnd(18, " ");
-  lines.push(`OS#${order.numero}  ${desc} 1   R$${order.valor_pago || "-"}`);
-  if (order.servico && order.aparelho) lines.push(`(${order.aparelho})`);
+  const { itens, total } = itensComTotal(order);
+  itens.forEach((it) => {
+    const desc = (it.descricao || "Servico").slice(0, 18).padEnd(18, " ");
+    lines.push(`${desc} 1   R$${it.preco || "-"}`);
+  });
+  if (order.aparelho) lines.push(`(${order.aparelho})`);
   lines.push("--------------------------------");
-  lines.push(`SUBTOTAL: R$ ${order.valor_pago || "-"}`);
-  lines.push(`TOTAL: R$ ${order.valor_pago || "-"}`);
+  lines.push(`SUBTOTAL: R$ ${total}`);
+  lines.push(`TOTAL: R$ ${total}`);
   lines.push(`FORMA PAGTO: ${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}`);
   lines.push(eq);
   lines.push("Obrigado pela preferencia!");
@@ -273,8 +296,14 @@ function printPaymentReceipt(order, size = "a4") {
     return;
   }
   const now = order.data_pagamento ? new Date(order.data_pagamento) : new Date();
-  const dataStr = now.toISOString().slice(0, 10);
-  const horaStr = now.toTimeString().slice(0, 8);
+  const { data: dataStr, hora: horaStr } = formatDateBR(now);
+  const { itens, total } = itensComTotal(order);
+  const itensRows = itens
+    .map(
+      (it) =>
+        `<tr><td>${it.descricao || "Serviço"}</td><td class="right">1</td><td class="right">R$ ${it.preco || "-"}</td></tr>`
+    )
+    .join("");
   win.document.write(`
     <html>
     <head>
@@ -297,21 +326,21 @@ function printPaymentReceipt(order, size = "a4") {
     <body>
       ${storeHeaderHtml()}
 
-      <div>Cupom No: ${String(order.numero).padStart(6, "0")}&nbsp;&nbsp;Data: ${dataStr} ${horaStr}</div>
+      <div>Cupom No: ${order.numero}&nbsp;&nbsp;Data: ${dataStr} ${horaStr}</div>
       <div>Cliente: ${order.cliente || "Cliente Avulso"}</div>
       ${order.tecnico ? `<div>Operador: ${order.tecnico}</div>` : ""}
+      ${order.aparelho ? `<div>Aparelho: ${order.aparelho}</div>` : ""}
       <div class="eq"></div>
 
       <table>
         <tr class="bold"><td>Descrição</td><td class="right">Qtd</td><td class="right">Subtotal</td></tr>
-        <tr><td>${order.servico || order.aparelho || "Serviço"} (OS #${order.numero})</td><td class="right">1</td><td class="right">R$ ${order.valor_pago || "-"}</td></tr>
-        ${order.servico && order.aparelho ? `<tr><td colspan="3" style="font-size:11px; color:#555;">Aparelho: ${order.aparelho}</td></tr>` : ""}
+        ${itensRows}
       </table>
 
       <div class="eq"></div>
       <div class="totals">
-        <div class="row"><span>SUBTOTAL:</span><span>R$ ${order.valor_pago || "-"}</span></div>
-        <div class="row bold"><span>TOTAL:</span><span>R$ ${order.valor_pago || "-"}</span></div>
+        <div class="row"><span>SUBTOTAL:</span><span>R$ ${total}</span></div>
+        <div class="row bold"><span>TOTAL:</span><span>R$ ${total}</span></div>
         <div class="row"><span>FORMA PAGTO:</span><span>${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}</span></div>
       </div>
       <div class="eq"></div>
@@ -735,6 +764,30 @@ export default function Home() {
     setNewItemLabel("");
   }
 
+  function sumItens(itens) {
+    return itens
+      .reduce((sum, it) => sum + (parseFloat(String(it.preco).replace(",", ".")) || 0), 0)
+      .toFixed(2)
+      .replace(".", ",");
+  }
+
+  function addServiceItem() {
+    const itens = [...(current.itens_servico || []), { id: uid(), descricao: "", preco: "" }];
+    setCurrent({ ...current, itens_servico: itens });
+  }
+
+  function updateServiceItem(id, field, value) {
+    const itens = (current.itens_servico || []).map((it) =>
+      it.id === id ? { ...it, [field]: value } : it
+    );
+    setCurrent({ ...current, itens_servico: itens, valor_pago: sumItens(itens) });
+  }
+
+  function removeServiceItem(id) {
+    const itens = (current.itens_servico || []).filter((it) => it.id !== id);
+    setCurrent({ ...current, itens_servico: itens, valor_pago: sumItens(itens) });
+  }
+
   async function uploadPhoto(dataUrl) {
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -1076,9 +1129,42 @@ export default function Home() {
           {current.id && (
             <section className="space-y-3">
               <p className="text-xs uppercase tracking-wide text-zinc-500">Pagamento (retirada)</p>
+
+              <div className="space-y-1.5">
+                {(current.itens_servico || []).map((item) => (
+                  <div key={item.id} className="flex gap-2">
+                    <input
+                      placeholder="Serviço (ex: Troca de tela)"
+                      value={item.descricao}
+                      onChange={(e) => updateServiceItem(item.id, "descricao", e.target.value)}
+                      className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      placeholder="Preço"
+                      inputMode="decimal"
+                      value={item.preco}
+                      onChange={(e) => updateServiceItem(item.id, "preco", e.target.value)}
+                      className="w-24 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      onClick={() => removeServiceItem(item.id)}
+                      className="shrink-0 text-zinc-600 text-sm px-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={addServiceItem}
+                className="w-full border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
+              >
+                + Adicionar serviço
+              </button>
+
               <div className="grid grid-cols-2 gap-3">
                 <input
-                  placeholder="Valor pago (R$)"
+                  placeholder="Valor total (R$)"
                   inputMode="decimal"
                   value={current.valor_pago}
                   onChange={(e) => setCurrent({ ...current, valor_pago: e.target.value })}
