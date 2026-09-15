@@ -36,6 +36,7 @@ export async function POST(req) {
       orcamento: body.orcamento || "",
       servico: body.servico || "",
       itens_servico: body.itens_servico || [],
+      orcamento_aprovado: body.orcamento_aprovado || false,
       tecnico: body.tecnico || "",
       status: body.status || "avaliacao",
       obs: body.obs || "",
