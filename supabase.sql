@@ -42,3 +42,13 @@ create policy "leitura publica de fotos"
 create policy "upload de fotos"
   on storage.objects for insert
   with check (bucket_id = 'fotos');
+
+create table if not exists settings (
+  id text primary key default 'default',
+  meta_faturamento text
+);
+
+alter table settings enable row level security;
+
+insert into settings (id, meta_faturamento) values ('default', '')
+on conflict (id) do nothing;
