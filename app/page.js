@@ -314,7 +314,7 @@ function printPaymentReceipt(order, size = "a4") {
       <style>
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         body {
-          font-family: "Courier New", monospace;
+          font-family: Arial, Helvetica, sans-serif;
           color: #000;
           margin: 0;
           font-weight: bold;
@@ -323,12 +323,12 @@ function printPaymentReceipt(order, size = "a4") {
         .center { text-align: center; }
         .bold { font-weight: bold; }
         .eq { border-top: 1px dashed #333; margin: 8px 0; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
-        td { padding: 2px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+        td { padding: 3px 0; }
         .right { text-align: right; }
-        .totals { font-size: 13px; margin-top: 6px; }
+        .totals { font-size: 15px; margin-top: 6px; }
         .totals .row { display: flex; justify-content: space-between; }
-        .garantia { font-size: 11px; margin-top: 14px; line-height: 1.5; text-align: center; }
+        .garantia { font-size: 13px; margin-top: 14px; line-height: 1.5; text-align: center; }
         ${paperCss(size)}
       </style>
     </head>
@@ -371,30 +371,30 @@ function paperCss(size) {
   if (size === "80mm") {
     return `
       @page { size: 80mm auto; margin: 2mm; }
-      body { width: 76mm; font-size: 11px; padding: 0; }
-      h1 { font-size: 13px; }
-      .store, .muted { font-size: 9px; }
-      .label { font-size: 8px; }
-      .row, .item { font-size: 11px; }
-      .terms { font-size: 9px; }
-      .sign-line { margin-top: 22px !important; font-size: 10px; }
+      body { width: 76mm; font-size: 14px; padding: 0; }
+      h1 { font-size: 16px; }
+      .store, .muted { font-size: 12px; }
+      .label { font-size: 11px; }
+      .row, .item { font-size: 14px; }
+      .terms { font-size: 12px; }
+      .sign-line { margin-top: 24px !important; font-size: 13px; }
     `;
   }
   if (size === "58mm") {
     return `
       @page { size: 58mm auto; margin: 2mm; }
-      body { width: 54mm; font-size: 10px; padding: 0; }
-      h1 { font-size: 11px; }
-      .store, .muted { font-size: 8px; }
-      .label { font-size: 7px; }
-      .row, .item { font-size: 10px; }
-      .terms { font-size: 8px; }
-      .sign-line { margin-top: 16px !important; font-size: 9px; }
+      body { width: 54mm; font-size: 13px; padding: 0; }
+      h1 { font-size: 14px; }
+      .store, .muted { font-size: 11px; }
+      .label { font-size: 10px; }
+      .row, .item { font-size: 15px; }
+      .terms { font-size: 11px; }
+      .sign-line { margin-top: 18px !important; font-size: 12px; }
     `;
   }
   return `
     @page { size: A4; margin: 15mm; }
-    body { max-width: 480px; padding: 24px; }
+    body { max-width: 480px; padding: 24px; font-size: 15px; }
   `;
 }
 
@@ -424,15 +424,15 @@ function printCustomerReceipt(order, size = "a4") {
           font-weight: bold;
           text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
         }
-        h1 { font-size: 18px; margin: 0 0 2px; }
-        .store { font-size: 12px; color: #000; margin-bottom: 18px; font-weight: bold; }
+        h1 { font-size: 21px; margin: 0 0 2px; }
+        .store { font-size: 14px; color: #000; margin-bottom: 18px; font-weight: bold; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
-        .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
-        .item { font-size: 13px; }
-        .terms { font-size: 11px; color: #000; margin: 18px 0; line-height: 1.5; font-weight: bold; }
+        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
+        .row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 3px; }
+        .item { font-size: 15px; }
+        .terms { font-size: 13px; color: #000; margin: 18px 0; line-height: 1.5; font-weight: bold; }
         .sign { margin-top: 40px; }
-        .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 12px; text-align: center; }
+        .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 14px; text-align: center; }
         ${paperCss(size)}
       </style>
     </head>
@@ -507,12 +507,12 @@ function printOrder(order, size = "a4") {
           font-weight: bold;
           text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
         }
-        h1 { font-size: 18px; margin: 0 0 2px; }
-        .muted { color: #000; font-size: 13px; margin-bottom: 18px; font-weight: bold; }
+        h1 { font-size: 21px; margin: 0 0 2px; }
+        .muted { color: #000; font-size: 15px; margin-bottom: 18px; font-weight: bold; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
-        .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
-        .item { font-size: 13px; }
+        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
+        .row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 3px; }
+        .item { font-size: 15px; }
         ${paperCss(size)}
       </style>
     </head>
