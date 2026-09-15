@@ -425,12 +425,12 @@ function printCustomerReceipt(order, size = "a4") {
           text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
         }
         h1 { font-size: 18px; margin: 0 0 2px; }
-        .store { font-size: 12px; color: #666; margin-bottom: 18px; }
+        .store { font-size: 12px; color: #000; margin-bottom: 18px; font-weight: bold; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px; }
+        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
         .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
         .item { font-size: 13px; }
-        .terms { font-size: 11px; color: #555; margin: 18px 0; line-height: 1.5; }
+        .terms { font-size: 11px; color: #000; margin: 18px 0; line-height: 1.5; font-weight: bold; }
         .sign { margin-top: 40px; }
         .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 12px; text-align: center; }
         ${paperCss(size)}
@@ -508,9 +508,9 @@ function printOrder(order, size = "a4") {
           text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
         }
         h1 { font-size: 18px; margin: 0 0 2px; }
-        .muted { color: #666; font-size: 13px; margin-bottom: 18px; }
+        .muted { color: #000; font-size: 13px; margin-bottom: 18px; font-weight: bold; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px; }
+        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
         .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
         .item { font-size: 13px; }
         ${paperCss(size)}
