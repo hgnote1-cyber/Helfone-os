@@ -612,6 +612,8 @@ export default function Home() {
   const [hideDelivered, setHideDelivered] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [printChoice, setPrintChoice] = useState(null);
+  const [autofillNotice, setAutofillNotice] = useState("");
+  const [showDashboard, setShowDashboard] = useState(false);
   const initialStatusRef = useRef(null);
   const originRef = useRef("");
 
@@ -640,6 +642,7 @@ export default function Home() {
     initialStatusRef.current = fresh.status;
     setError("");
     setNewItemLabel("");
+    setAutofillNotice("");
     setView("form");
   }
 
@@ -648,6 +651,7 @@ export default function Home() {
     initialStatusRef.current = order.status;
     setError("");
     setNewItemLabel("");
+    setAutofillNotice("");
     setView("form");
   }
 
@@ -823,6 +827,54 @@ export default function Home() {
     }
   }
 
+  function daysSince(dateStr) {
+    if (!dateStr) return 0;
+    return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  }
+
+  function lastStatusChangeDate(order) {
+    const hist = order.status_history || [];
+    if (hist.length > 0) return hist[hist.length - 1].at;
+    return order.created_at;
+  }
+
+  function computeDashboard(list) {
+    const now = new Date();
+    const inThisMonth = (dateStr) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    };
+    const monthOrders = list.filter((o) => inThisMonth(o.created_at));
+    const statusCounts = STATUS.reduce((acc, s) => {
+      acc[s.id] = monthOrders.filter((o) => o.status === s.id).length;
+      return acc;
+    }, {});
+    const faturamento = list
+      .filter((o) => inThisMonth(o.data_pagamento))
+      .reduce((sum, o) => sum + (parseFloat(String(o.valor_pago).replace(",", ".")) || 0), 0);
+    const tally = {};
+    list.forEach((o) => {
+      const itens =
+        (o.itens_servico || []).length > 0
+          ? o.itens_servico
+          : o.servico
+          ? [{ descricao: o.servico }]
+          : [];
+      itens.forEach((it) => {
+        const key = (it.descricao || "").trim();
+        if (!key) return;
+        tally[key] = (tally[key] || 0) + 1;
+      });
+    });
+    const topServicos = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return { totalMes: monthOrders.length, statusCounts, faturamento, topServicos };
+  }
+
+  const stalledOrders = (orders || []).filter(
+    (o) => o.status !== "entregue" && daysSince(lastStatusChangeDate(o)) >= 5
+  );
+
   const filtered = (orders || []).filter((o) => {
     const matchesFilter = filter === "todos" || o.status === filter;
     const hiddenByArchive = filter === "todos" && hideDelivered && o.status === "entregue";
@@ -952,9 +1004,28 @@ export default function Home() {
             <input
               placeholder="Telefone (com DDD)"
               value={current.telefone}
-              onChange={(e) => setCurrent({ ...current, telefone: e.target.value })}
+              onChange={(e) => {
+                const value = e.target.value;
+                let updated = { ...current, telefone: value };
+                if (!current.id) {
+                  const digits = value.replace(/\D/g, "");
+                  if (digits.length >= 10 && !current.cliente) {
+                    const match = (orders || []).find(
+                      (o) => (o.telefone || "").replace(/\D/g, "") === digits
+                    );
+                    if (match) {
+                      updated = { ...updated, cliente: match.cliente || "", cpf: match.cpf || "" };
+                      setAutofillNotice(match.cliente || "");
+                    }
+                  }
+                }
+                setCurrent(updated);
+              }}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
+            {autofillNotice && (
+              <p className="text-xs text-emerald-400">Cliente reconhecido: {autofillNotice}</p>
+            )}
             <input
               placeholder="CPF (opcional)"
               inputMode="numeric"
@@ -1320,9 +1391,14 @@ export default function Home() {
             />
             Mostrar entregues
           </label>
-          <button onClick={() => exportCsv(filtered)} className="text-xs text-zinc-500 underline">
-            Exportar CSV
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowDashboard(true)} className="text-xs text-zinc-500 underline">
+              Painel
+            </button>
+            <button onClick={() => exportCsv(filtered)} className="text-xs text-zinc-500 underline">
+              Exportar CSV
+            </button>
+          </div>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
           <button
@@ -1354,6 +1430,13 @@ export default function Home() {
 
       <div className="px-4 py-3">
         {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
+
+        {stalledOrders.length > 0 && (
+          <div className="bg-amber-950/40 border border-amber-800 rounded-lg px-3 py-2 mb-3 text-xs text-amber-300">
+            ⏰ {stalledOrders.length} {stalledOrders.length === 1 ? "ordem parada" : "ordens paradas"} há
+            5 dias ou mais sem mudar de status.
+          </div>
+        )}
 
         {orders === null && (
           <p className="text-sm text-zinc-500 py-10 text-center">Carregando ordens…</p>
@@ -1399,6 +1482,11 @@ export default function Home() {
                       Fotos: {o.entry_photos?.length || 0} entrada, {o.exit_photos?.length || 0} saída
                     </span>
                   )}
+                  {o.status !== "entregue" && daysSince(lastStatusChangeDate(o)) >= 5 && (
+                    <span className="text-amber-400">
+                      ⏰ Parada há {daysSince(lastStatusChangeDate(o))}d
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-1.5 mt-2 overflow-x-auto">
                   {STATUS.map((st) => (
@@ -1420,6 +1508,67 @@ export default function Home() {
           })}
         </div>
       </div>
+
+      {showDashboard && (
+        <div
+          onClick={() => setShowDashboard(false)}
+          className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-zinc-900 border-t border-zinc-800 rounded-t-2xl p-4 space-y-4 max-h-[85vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Painel do mês</p>
+              <button onClick={() => setShowDashboard(false)} className="text-zinc-500 text-sm">
+                Fechar
+              </button>
+            </div>
+            {(() => {
+              const d = computeDashboard(orders || []);
+              return (
+                <>
+                  <div className="bg-zinc-800 rounded-lg p-3">
+                    <p className="text-xs text-zinc-500">OS abertas este mês</p>
+                    <p className="text-2xl font-medium">{d.totalMes}</p>
+                  </div>
+                  <div className="bg-zinc-800 rounded-lg p-3">
+                    <p className="text-xs text-zinc-500">Faturamento recebido este mês</p>
+                    <p className="text-2xl font-medium text-emerald-400">
+                      R$ {d.faturamento.toFixed(2).replace(".", ",")}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Por status (este mês)</p>
+                    {STATUS.map((s) => (
+                      <div key={s.id} className="flex justify-between text-sm">
+                        <span className="flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                          {s.label}
+                        </span>
+                        <span className="text-zinc-400">{d.statusCounts[s.id] || 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {d.topServicos.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">
+                        Serviços mais feitos (todo o período)
+                      </p>
+                      {d.topServicos.map(([nome, count]) => (
+                        <div key={nome} className="flex justify-between text-sm">
+                          <span>{nome}</span>
+                          <span className="text-zinc-400">{count}x</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
