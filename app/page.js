@@ -614,6 +614,8 @@ export default function Home() {
   const [printChoice, setPrintChoice] = useState(null);
   const [autofillNotice, setAutofillNotice] = useState("");
   const [showDashboard, setShowDashboard] = useState(false);
+  const [metaFaturamento, setMetaFaturamento] = useState("");
+  const [metaInput, setMetaInput] = useState("");
   const initialStatusRef = useRef(null);
   const originRef = useRef("");
 
@@ -632,8 +634,29 @@ export default function Home() {
     }
   }
 
+  async function loadSettings() {
+    try {
+      const res = await fetch("/api/settings");
+      const data = await res.json();
+      setMetaFaturamento(data.meta_faturamento || "");
+      setMetaInput(data.meta_faturamento || "");
+    } catch (e) {}
+  }
+
+  async function saveMeta() {
+    setMetaFaturamento(metaInput);
+    try {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meta_faturamento: metaInput }),
+      });
+    } catch (e) {}
+  }
+
   useEffect(() => {
     load();
+    loadSettings();
   }, []);
 
   function openNew() {
@@ -1033,6 +1056,30 @@ export default function Home() {
               onChange={(e) => setCurrent({ ...current, cpf: formatCpf(e.target.value) })}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
+            {(() => {
+              const digits = (current.telefone || "").replace(/\D/g, "");
+              const historico = digits.length >= 8
+                ? (orders || []).filter(
+                    (o) => o.id !== current.id && (o.telefone || "").replace(/\D/g, "") === digits
+                  )
+                : [];
+              if (historico.length === 0) return null;
+              return (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 space-y-1.5">
+                  <p className="text-xs text-zinc-500">
+                    Histórico do cliente ({historico.length} {historico.length === 1 ? "OS anterior" : "OS anteriores"})
+                  </p>
+                  {historico.slice(0, 5).map((o) => (
+                    <div key={o.id} className="flex justify-between text-xs text-zinc-400">
+                      <span>
+                        OS #{o.numero} · {o.aparelho}
+                      </span>
+                      <span className="text-zinc-600">{statusInfo(o.status).label}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </section>
 
           <section className="space-y-3">
@@ -1537,6 +1584,39 @@ export default function Home() {
                     <p className="text-2xl font-medium text-emerald-400">
                       R$ {d.faturamento.toFixed(2).replace(".", ",")}
                     </p>
+                    {metaFaturamento && parseFloat(metaFaturamento.replace(",", ".")) > 0 && (
+                      <div className="mt-2">
+                        <div className="w-full h-2 bg-zinc-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                (d.faturamento / parseFloat(metaFaturamento.replace(",", "."))) * 100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Meta: R$ {metaFaturamento}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        placeholder="Definir meta do mês (R$)"
+                        inputMode="decimal"
+                        value={metaInput}
+                        onChange={(e) => setMetaInput(e.target.value)}
+                        className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                      />
+                      <button
+                        onClick={saveMeta}
+                        className="text-xs bg-zinc-700 text-zinc-100 px-3 rounded-lg"
+                      >
+                        Salvar
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <p className="text-xs uppercase tracking-wide text-zinc-500">Por status (este mês)</p>
