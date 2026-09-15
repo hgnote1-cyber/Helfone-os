@@ -312,7 +312,14 @@ function printPaymentReceipt(order, size = "a4") {
       <title>OS #${order.numero} - Cupom de pagamento</title>
       <meta charset="utf-8" />
       <style>
-        body { font-family: "Courier New", monospace; color: #000; margin: 0; font-weight: bold; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body {
+          font-family: "Courier New", monospace;
+          color: #000;
+          margin: 0;
+          font-weight: bold;
+          text-shadow: 0.4px 0 0 currentColor, -0.4px 0 0 currentColor, 0 0.4px 0 currentColor, 0 -0.4px 0 currentColor;
+        }
         .center { text-align: center; }
         .bold { font-weight: bold; }
         .eq { border-top: 1px dashed #333; margin: 8px 0; }
@@ -409,7 +416,14 @@ function printCustomerReceipt(order, size = "a4") {
       <title>OS #${order.numero} - Via do cliente</title>
       <meta charset="utf-8" />
       <style>
-        body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body {
+          font-family: Arial, Helvetica, sans-serif;
+          color: #000;
+          margin: 0;
+          font-weight: bold;
+          text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
+        }
         h1 { font-size: 18px; margin: 0 0 2px; }
         .store { font-size: 12px; color: #666; margin-bottom: 18px; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
@@ -485,7 +499,14 @@ function printOrder(order, size = "a4") {
       <title>OS #${order.numero}</title>
       <meta charset="utf-8" />
       <style>
-        body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body {
+          font-family: Arial, Helvetica, sans-serif;
+          color: #000;
+          margin: 0;
+          font-weight: bold;
+          text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
+        }
         h1 { font-size: 18px; margin: 0 0 2px; }
         .muted { color: #666; font-size: 13px; margin-bottom: 18px; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
