@@ -10,6 +10,7 @@ create table if not exists ordens (
   senha text,
   orcamento text,
   servico text,
+  itens_servico jsonb default '[]',
   tecnico text,
   status text default 'avaliacao',
   obs text,
