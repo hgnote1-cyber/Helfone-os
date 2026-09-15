@@ -35,6 +35,7 @@ export async function POST(req) {
       senha: body.senha || "",
       orcamento: body.orcamento || "",
       servico: body.servico || "",
+      itens_servico: body.itens_servico || [],
       tecnico: body.tecnico || "",
       status: body.status || "avaliacao",
       obs: body.obs || "",
