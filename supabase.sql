@@ -52,3 +52,5 @@ alter table settings enable row level security;
 
 insert into settings (id, meta_faturamento) values ('default', '')
 on conflict (id) do nothing;
+
+alter table ordens add column if not exists orcamento_aprovado boolean default false;
