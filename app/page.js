@@ -317,8 +317,7 @@ function printPaymentReceipt(order, size = "a4") {
           font-family: Arial, Helvetica, sans-serif;
           color: #000;
           margin: 0;
-          font-weight: bold;
-          text-shadow: 0.4px 0 0 currentColor, -0.4px 0 0 currentColor, 0 0.4px 0 currentColor, 0 -0.4px 0 currentColor;
+          font-weight: normal;
         }
         .center { text-align: center; }
         .bold { font-weight: bold; }
@@ -421,16 +420,15 @@ function printCustomerReceipt(order, size = "a4") {
           font-family: Arial, Helvetica, sans-serif;
           color: #000;
           margin: 0;
-          font-weight: bold;
-          text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
+          font-weight: normal;
         }
         h1 { font-size: 21px; margin: 0 0 2px; }
-        .store { font-size: 14px; color: #000; margin-bottom: 18px; font-weight: bold; }
+        .store { font-size: 14px; color: #000; margin-bottom: 18px; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
+        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: 600; }
         .row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 3px; }
         .item { font-size: 15px; }
-        .terms { font-size: 13px; color: #000; margin: 18px 0; line-height: 1.5; font-weight: bold; }
+        .terms { font-size: 13px; color: #000; margin: 18px 0; line-height: 1.5; }
         .sign { margin-top: 40px; }
         .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 14px; text-align: center; }
         ${paperCss(size)}
@@ -504,13 +502,12 @@ function printOrder(order, size = "a4") {
           font-family: Arial, Helvetica, sans-serif;
           color: #000;
           margin: 0;
-          font-weight: bold;
-          text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor, 0 0.3px 0 currentColor, 0 -0.3px 0 currentColor;
+          font-weight: normal;
         }
         h1 { font-size: 21px; margin: 0 0 2px; }
-        .muted { color: #000; font-size: 15px; margin-bottom: 18px; font-weight: bold; }
+        .muted { color: #000; font-size: 15px; margin-bottom: 18px; }
         .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: bold; }
+        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; margin-bottom: 3px; font-weight: 600; }
         .row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 3px; }
         .item { font-size: 15px; }
         ${paperCss(size)}
