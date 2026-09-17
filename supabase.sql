@@ -54,3 +54,10 @@ insert into settings (id, meta_faturamento) values ('default', '')
 on conflict (id) do nothing;
 
 alter table ordens add column if not exists orcamento_aprovado boolean default false;
+
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  subscription jsonb not null,
+  created_at timestamptz default now()
+);
+alter table push_subscriptions enable row level security;
