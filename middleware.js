@@ -13,6 +13,7 @@ export function middleware(req) {
     pathname.startsWith("/manifest.json") ||
     pathname.startsWith("/icon-") ||
     pathname.startsWith("/apple-touch-icon") ||
+    pathname.startsWith("/sw.js") ||
     pathname.startsWith("/favicon");
 
   if (isPublicPath) {
