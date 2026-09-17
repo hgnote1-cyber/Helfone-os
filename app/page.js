@@ -642,6 +642,7 @@ export default function Home() {
   const [printChoice, setPrintChoice] = useState(null);
   const [autofillNotice, setAutofillNotice] = useState("");
   const [showDashboard, setShowDashboard] = useState(false);
+  const [pushStatus, setPushStatus] = useState("checking"); // checking | off | on | unsupported
   const [metaFaturamento, setMetaFaturamento] = useState("");
   const [metaInput, setMetaInput] = useState("");
   const initialStatusRef = useRef(null);
@@ -649,7 +650,52 @@ export default function Home() {
 
   useEffect(() => {
     originRef.current = window.location.origin;
+    checkPushStatus();
   }, []);
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+  }
+
+  async function checkPushStatus() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("unsupported");
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      const sub = await reg.pushManager.getSubscription();
+      setPushStatus(sub ? "on" : "off");
+    } catch (e) {
+      setPushStatus("unsupported");
+    }
+  }
+
+  async function enablePush() {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushStatus("off");
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
+      });
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub),
+      });
+      setPushStatus("on");
+    } catch (e) {
+      setPushStatus("off");
+    }
+  }
 
   async function load() {
     try {
@@ -1451,6 +1497,14 @@ export default function Home() {
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-lg font-medium">Ordens de serviço</h1>
           <div className="flex items-center gap-2">
+            {pushStatus === "off" && (
+              <button
+                onClick={enablePush}
+                className="text-amber-400 text-xs px-2 border border-amber-800 rounded-lg py-1"
+              >
+                🔔 Ativar avisos
+              </button>
+            )}
             <button
               onClick={openNew}
               className="bg-amber-500 text-zinc-950 text-sm font-medium px-3 py-1.5 rounded-lg"
