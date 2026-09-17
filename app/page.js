@@ -120,9 +120,17 @@ function whatsappLink(order, origin) {
   const withCountry = normalizePhoneBR(order.telefone);
   if (!withCountry) return null;
   const trackUrl = origin && order.id ? `${origin}/acompanhar/${order.id}` : "";
-  const msg = `Olá ${order.cliente || ""}! Sobre o seu ${order.aparelho || "aparelho"} (OS #${order.numero}): status atual é "${s.label}".${
-    trackUrl ? ` Acompanhe por aqui: ${trackUrl}` : ""
-  }`;
+  const pendingApproval =
+    order.orcamento && !order.orcamento_aprovado && order.status !== "cancelado";
+
+  let msg = `Olá ${order.cliente || ""}! Sobre o seu ${order.aparelho || "aparelho"} (OS #${order.numero}): status atual é "${s.label}".`;
+
+  if (pendingApproval && trackUrl) {
+    msg += ` O orçamento ficou em R$ ${order.orcamento}. Pra aprovar ou recusar o serviço, é só tocar aqui: ${trackUrl}`;
+  } else if (trackUrl) {
+    msg += ` Acompanhe por aqui: ${trackUrl}`;
+  }
+
   return `https://wa.me/${withCountry}?text=${encodeURIComponent(msg)}`;
 }
 
