@@ -1,5 +1,22 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import webpush from "@/lib/webpush";
+
+async function notifyAll(title, body, url) {
+  try {
+    const { data: subs } = await supabaseAdmin.from("push_subscriptions").select("*");
+    if (!subs || subs.length === 0) return;
+    await Promise.all(
+      subs.map((row) =>
+        webpush.sendNotification(row.subscription, JSON.stringify({ title, body, url })).catch(async (err) => {
+          if (err.statusCode === 404 || err.statusCode === 410) {
+            await supabaseAdmin.from("push_subscriptions").delete().eq("endpoint", row.endpoint);
+          }
+        })
+      )
+    );
+  } catch (e) {}
+}
 
 export async function GET(req, { params }) {
   const { data, error } = await supabaseAdmin
@@ -58,10 +75,31 @@ export async function POST(req, { params }) {
           ],
         };
 
+  const { data: fullOrder } = await supabaseAdmin
+    .from("ordens")
+    .select("numero, cliente, aparelho, orcamento")
+    .eq("id", params.id)
+    .single();
+
   const { error: updateError } = await supabaseAdmin.from("ordens").update(update).eq("id", params.id);
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  const nome = fullOrder?.cliente || "Cliente";
+  if (action === "approve") {
+    await notifyAll(
+      "Orçamento aprovado!",
+      `${nome} aprovou o orçamento da OS #${fullOrder?.numero} (${fullOrder?.aparelho || ""}) - R$ ${fullOrder?.orcamento || ""}`,
+      `/`
+    );
+  } else {
+    await notifyAll(
+      "Orçamento recusado",
+      `${nome} recusou o orçamento da OS #${fullOrder?.numero} (${fullOrder?.aparelho || ""}). A OS foi cancelada.`,
+      `/`
+    );
   }
 
   return NextResponse.json({ ok: true });
