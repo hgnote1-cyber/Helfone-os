@@ -29,6 +29,7 @@ export async function POST(req) {
       cliente: body.cliente,
       telefone: body.telefone || "",
       cpf: body.cpf || "",
+      cnpj: body.cnpj || "",
       aparelho: body.aparelho,
       imei: body.imei || "",
       defeito: body.defeito || "",

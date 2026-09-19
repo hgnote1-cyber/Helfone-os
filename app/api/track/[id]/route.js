@@ -64,16 +64,35 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Essa ordem já teve o orçamento respondido." }, { status: 409 });
   }
 
-  const update =
-    action === "approve"
-      ? { orcamento_aprovado: true }
-      : {
-          status: "cancelado",
-          status_history: [
+  const STAGE_ORDER = ["avaliacao", "peca", "conserto", "pronto", "entregue"];
+  const APPROVE_TARGET_STATUS = "conserto";
+
+  let update;
+  if (action === "approve") {
+    const currentIdx = STAGE_ORDER.indexOf(order.status);
+    const targetIdx = STAGE_ORDER.indexOf(APPROVE_TARGET_STATUS);
+    const shouldAdvance = currentIdx !== -1 && currentIdx < targetIdx;
+    const newStatus = shouldAdvance ? APPROVE_TARGET_STATUS : order.status;
+
+    update = {
+      orcamento_aprovado: true,
+      status: newStatus,
+      status_history: shouldAdvance
+        ? [
             ...(order.status_history || []),
-            { status: "cancelado", at: new Date().toISOString() },
-          ],
-        };
+            { status: newStatus, at: new Date().toISOString(), obs: "Aprovado pelo cliente" },
+          ]
+        : order.status_history || [],
+    };
+  } else {
+    update = {
+      status: "cancelado",
+      status_history: [
+        ...(order.status_history || []),
+        { status: "cancelado", at: new Date().toISOString() },
+      ],
+    };
+  }
 
   const { data: fullOrder } = await supabaseAdmin
     .from("ordens")

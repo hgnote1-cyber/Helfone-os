@@ -39,6 +39,7 @@ function emptyOrder() {
     cliente: "",
     telefone: "",
     cpf: "",
+    cnpj: "",
     aparelho: "",
     imei: "",
     defeito: "",
@@ -103,6 +104,21 @@ function formatCpf(value) {
   return out;
 }
 
+function formatCnpj(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 14);
+  const p1 = digits.slice(0, 2);
+  const p2 = digits.slice(2, 5);
+  const p3 = digits.slice(5, 8);
+  const p4 = digits.slice(8, 12);
+  const p5 = digits.slice(12, 14);
+  let out = p1;
+  if (p2) out += "." + p2;
+  if (p3) out += "." + p3;
+  if (p4) out += "/" + p4;
+  if (p5) out += "-" + p5;
+  return out;
+}
+
 function normalizePhoneBR(raw) {
   let digits = (raw || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -135,10 +151,10 @@ function whatsappLink(order, origin) {
 }
 
 function exportCsv(orders) {
-  const headers = ["numero", "cliente", "telefone", "cpf", "aparelho", "imei", "defeito", "status", "orcamento", "tecnico", "criado_em"];
+  const headers = ["numero", "cliente", "telefone", "cpf", "cnpj", "aparelho", "imei", "defeito", "status", "orcamento", "tecnico", "criado_em"];
   const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = orders.map((o) =>
-    [o.numero, o.cliente, o.telefone, o.cpf, o.aparelho, o.imei, o.defeito, statusInfo(o.status).label, o.orcamento, o.tecnico, o.created_at]
+    [o.numero, o.cliente, o.telefone, o.cpf, o.cnpj, o.aparelho, o.imei, o.defeito, statusInfo(o.status).label, o.orcamento, o.tecnico, o.created_at]
       .map(escape)
       .join(",")
   );
@@ -205,6 +221,7 @@ function buildReceiptText(order, variant) {
   lines.push(order.cliente || "");
   if (order.telefone) lines.push(order.telefone);
   if (order.cpf) lines.push(`CPF: ${order.cpf}`);
+  if (order.cnpj) lines.push(`CNPJ: ${order.cnpj}`);
   lines.push(sep);
   lines.push("APARELHO");
   lines.push(order.aparelho || "");
@@ -451,6 +468,7 @@ function printCustomerReceipt(order, size = "a4") {
         <div>${order.cliente || ""}</div>
         <div>${order.telefone || ""}</div>
         ${order.cpf ? `<div>CPF: ${order.cpf}</div>` : ""}
+        ${order.cnpj ? `<div>CNPJ: ${order.cnpj}</div>` : ""}
       </div>
 
       <div class="section">
@@ -530,6 +548,7 @@ function printOrder(order, size = "a4") {
         <div>${order.cliente || ""}</div>
         <div>${order.telefone || ""}</div>
         ${order.cpf ? `<div>CPF: ${order.cpf}</div>` : ""}
+        ${order.cnpj ? `<div>CNPJ: ${order.cnpj}</div>` : ""}
       </div>
 
       <div class="section">
@@ -993,6 +1012,7 @@ export default function Home() {
       String(o.numero).includes(q) ||
       (qDigits && (o.telefone || "").replace(/\D/g, "").includes(qDigits)) ||
       (qDigits && (o.cpf || "").replace(/\D/g, "").includes(qDigits)) ||
+      (qDigits && (o.cnpj || "").replace(/\D/g, "").includes(qDigits)) ||
       (qDigits && (o.imei || "").includes(qDigits));
     return matchesFilter && !hiddenByArchive && matchesQuery;
   });
@@ -1120,7 +1140,7 @@ export default function Home() {
                       (o) => (o.telefone || "").replace(/\D/g, "") === digits
                     );
                     if (match) {
-                      updated = { ...updated, cliente: match.cliente || "", cpf: match.cpf || "" };
+                      updated = { ...updated, cliente: match.cliente || "", cpf: match.cpf || "", cnpj: match.cnpj || "" };
                       setAutofillNotice(match.cliente || "");
                     }
                   }
@@ -1137,6 +1157,13 @@ export default function Home() {
               inputMode="numeric"
               value={current.cpf}
               onChange={(e) => setCurrent({ ...current, cpf: formatCpf(e.target.value) })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+            />
+            <input
+              placeholder="CNPJ (opcional, se for empresa)"
+              inputMode="numeric"
+              value={current.cnpj}
+              onChange={(e) => setCurrent({ ...current, cnpj: formatCnpj(e.target.value) })}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
             {(() => {
