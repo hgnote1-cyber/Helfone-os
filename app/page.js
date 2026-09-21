@@ -282,10 +282,15 @@ function buildPaymentReceiptText(order) {
   const eq = "================================";
   const lines = [];
   lines.push(...storeHeaderLines());
+  lines.push("RECIBO DE PRESTACAO DE SERVICO");
+  lines.push("(nao e nota fiscal eletronica)");
+  lines.push(eq);
   const now = order.data_pagamento ? new Date(order.data_pagamento) : new Date();
   const { data: dataStr, hora: horaStr } = formatDateBR(now);
   lines.push(`Cupom No: ${order.numero}  Data: ${dataStr} ${horaStr}`);
   lines.push(`Cliente: ${order.cliente || "Cliente Avulso"}`);
+  if (order.cpf) lines.push(`CPF: ${order.cpf}`);
+  if (order.cnpj) lines.push(`CNPJ: ${order.cnpj}`);
   if (order.tecnico) lines.push(`Operador: ${order.tecnico}`);
   lines.push(eq);
   lines.push("DESCRICAO           QTD  SUBTOT");
@@ -328,13 +333,13 @@ function printPaymentReceipt(order, size = "a4") {
   const itensRows = itens
     .map(
       (it) =>
-        `<tr><td>${it.descricao || "Serviço"}</td><td class="right">1</td><td class="right">R$ ${it.preco || "-"}</td></tr>`
+        `<tr><td class="qtd">1</td><td>${it.descricao || "Serviço"}</td><td class="right">R$ ${it.preco || "-"}</td></tr>`
     )
     .join("");
   win.document.write(`
     <html>
     <head>
-      <title>OS #${order.numero} - Cupom de pagamento</title>
+      <title>OS #${order.numero} - Recibo</title>
       <meta charset="utf-8" />
       <style>
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -347,42 +352,77 @@ function printPaymentReceipt(order, size = "a4") {
         .center { text-align: center; }
         .bold { font-weight: bold; }
         .eq { border-top: 1px dashed #333; margin: 8px 0; }
+        .titulo {
+          text-align: center;
+          font-weight: bold;
+          font-size: 14px;
+          letter-spacing: 0.5px;
+          border-top: 1px dashed #333;
+          border-bottom: 1px dashed #333;
+          padding: 6px 0;
+          margin: 10px 0;
+        }
+        .aviso {
+          text-align: center;
+          font-size: 11px;
+          color: #444;
+          margin-bottom: 10px;
+        }
+        .cliente-info { font-size: 14px; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+        th { text-align: left; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 3px; }
         td { padding: 3px 0; }
+        td.qtd, th.qtd { text-align: center; width: 30px; }
         .right { text-align: right; }
         .totals { font-size: 15px; margin-top: 6px; }
         .totals .row { display: flex; justify-content: space-between; }
+        .totals .total { font-weight: bold; font-size: 17px; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
         .garantia { font-size: 13px; margin-top: 14px; line-height: 1.5; text-align: center; }
+        .assinatura { margin-top: 26px; text-align: center; font-size: 13px; }
+        .linha-assinatura { border-top: 1px solid #000; width: 80%; margin: 30px auto 4px; }
+        .rodape { text-align: center; font-size: 11px; color: #666; margin-top: 14px; }
         ${paperCss(size)}
       </style>
     </head>
     <body>
       ${storeHeaderHtml()}
 
-      <div>Cupom No: ${order.numero}&nbsp;&nbsp;Data: ${dataStr} ${horaStr}</div>
-      <div>Cliente: ${order.cliente || "Cliente Avulso"}</div>
-      ${order.tecnico ? `<div>Operador: ${order.tecnico}</div>` : ""}
-      ${order.aparelho ? `<div>Aparelho: ${order.aparelho}</div>` : ""}
+      <div class="titulo">RECIBO DE PRESTAÇÃO DE SERVIÇO</div>
+      <div class="aviso">Este documento não é nota fiscal eletrônica. Serve como comprovante de pagamento e garantia.</div>
+
+      <div class="eq"></div>
+      <div class="cliente-info">
+        <div>Cupom No: ${order.numero}&nbsp;&nbsp;Data: ${dataStr} ${horaStr}</div>
+        <div>Cliente: ${order.cliente || "Cliente Avulso"}</div>
+        ${order.cpf ? `<div>CPF: ${order.cpf}</div>` : ""}
+        ${order.cnpj ? `<div>CNPJ: ${order.cnpj}</div>` : ""}
+        ${order.tecnico ? `<div>Operador: ${order.tecnico}</div>` : ""}
+        ${order.aparelho ? `<div>Aparelho: ${order.aparelho}</div>` : ""}
+      </div>
       <div class="eq"></div>
 
       <table>
-        <tr class="bold"><td>Descrição</td><td class="right">Qtd</td><td class="right">Subtotal</td></tr>
+        <tr><th class="qtd">Qtd</th><th>Descrição</th><th class="right">Valor</th></tr>
         ${itensRows}
       </table>
 
-      <div class="eq"></div>
       <div class="totals">
-        <div class="row"><span>SUBTOTAL:</span><span>R$ ${total}</span></div>
-        <div class="row bold"><span>TOTAL:</span><span>R$ ${total}</span></div>
-        <div class="row"><span>FORMA PAGTO:</span><span>${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}</span></div>
+        <div class="row"><span>Subtotal</span><span>R$ ${total}</span></div>
+        <div class="row total"><span>TOTAL</span><span>R$ ${total}</span></div>
+        <div class="row" style="margin-top:4px;"><span>Forma de pagamento</span><span>${PAGAMENTO_LABELS[order.forma_pagamento] || "-"}</span></div>
       </div>
-      <div class="eq"></div>
 
       <div class="garantia">
-        Obrigado pela preferência!<br/>
-        Garantia de ${order.garantia_dias || "90"} dias contra defeitos de fabricação.
+        Garantia de ${order.garantia_dias || "90"} dias contra defeitos de fabricação, contados a partir da data de retirada.
         Não cobre mau uso, quedas, umidade ou violação do produto.
       </div>
+
+      <div class="assinatura">
+        <div class="linha-assinatura"></div>
+        Assinatura do cliente
+      </div>
+
+      <div class="rodape">Obrigado pela preferência!</div>
     </body>
     </html>
   `);
