@@ -283,7 +283,6 @@ function buildPaymentReceiptText(order) {
   const lines = [];
   lines.push(...storeHeaderLines());
   lines.push("RECIBO DE PRESTACAO DE SERVICO");
-  lines.push("(nao e nota fiscal eletronica)");
   lines.push(eq);
   const now = order.data_pagamento ? new Date(order.data_pagamento) : new Date();
   const { data: dataStr, hora: horaStr } = formatDateBR(now);
@@ -362,12 +361,6 @@ function printPaymentReceipt(order, size = "a4") {
           padding: 6px 0;
           margin: 10px 0;
         }
-        .aviso {
-          text-align: center;
-          font-size: 11px;
-          color: #444;
-          margin-bottom: 10px;
-        }
         .cliente-info { font-size: 14px; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
         th { text-align: left; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 3px; }
@@ -378,8 +371,6 @@ function printPaymentReceipt(order, size = "a4") {
         .totals .row { display: flex; justify-content: space-between; }
         .totals .total { font-weight: bold; font-size: 17px; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
         .garantia { font-size: 13px; margin-top: 14px; line-height: 1.5; text-align: center; }
-        .assinatura { margin-top: 26px; text-align: center; font-size: 13px; }
-        .linha-assinatura { border-top: 1px solid #000; width: 80%; margin: 30px auto 4px; }
         .rodape { text-align: center; font-size: 11px; color: #666; margin-top: 14px; }
         ${paperCss(size)}
       </style>
@@ -388,7 +379,6 @@ function printPaymentReceipt(order, size = "a4") {
       ${storeHeaderHtml()}
 
       <div class="titulo">RECIBO DE PRESTAÇÃO DE SERVIÇO</div>
-      <div class="aviso">Este documento não é nota fiscal eletrônica. Serve como comprovante de pagamento e garantia.</div>
 
       <div class="eq"></div>
       <div class="cliente-info">
@@ -415,11 +405,6 @@ function printPaymentReceipt(order, size = "a4") {
       <div class="garantia">
         Garantia de ${order.garantia_dias || "90"} dias contra defeitos de fabricação, contados a partir da data de retirada.
         Não cobre mau uso, quedas, umidade ou violação do produto.
-      </div>
-
-      <div class="assinatura">
-        <div class="linha-assinatura"></div>
-        Assinatura do cliente
       </div>
 
       <div class="rodape">Obrigado pela preferência!</div>
