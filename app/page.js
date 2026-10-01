@@ -362,14 +362,15 @@ function printPaymentReceipt(order, size = "a4") {
           margin: 10px 0;
         }
         .cliente-info { font-size: 14px; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+        table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
         th { text-align: left; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 3px; }
-        td { padding: 3px 0; }
-        td.qtd, th.qtd { text-align: center; width: 30px; }
-        .right { text-align: right; }
-        .totals { font-size: 15px; margin-top: 6px; }
-        .totals .row { display: flex; justify-content: space-between; }
-        .totals .total { font-weight: bold; font-size: 17px; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
+        td { padding: 3px 2px 3px 0; word-wrap: break-word; overflow-wrap: break-word; }
+        td.qtd, th.qtd { text-align: center; width: 12%; }
+        .right { text-align: right; width: 32%; padding-right: 0 !important; }
+        .totals { font-size: 14px; margin-top: 6px; width: 100%; }
+        .totals .row { display: flex; justify-content: space-between; gap: 8px; }
+        .totals .row span:last-child { text-align: right; white-space: nowrap; }
+        .totals .total { font-weight: bold; font-size: 16px; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
         .garantia { font-size: 13px; margin-top: 14px; line-height: 1.5; text-align: center; }
         .rodape { text-align: center; font-size: 11px; color: #666; margin-top: 14px; }
         ${paperCss(size)}
@@ -417,10 +418,15 @@ function printPaymentReceipt(order, size = "a4") {
 }
 
 function paperCss(size) {
+  // Observação: várias impressoras térmicas ignoram a margem do @page e
+  // imprimem a largura nominal do rolo "cheia". Por isso a margem de
+  // segurança aqui vem do padding do body (que a impressora respeita, por
+  // ser conteúdo real), não só do @page margin.
   if (size === "80mm") {
     return `
-      @page { size: 80mm auto; margin: 2mm; }
-      body { width: 76mm; font-size: 14px; padding: 0; }
+      @page { size: 80mm auto; margin: 0; }
+      * { box-sizing: border-box; }
+      body { width: 80mm; padding: 0 3mm; font-size: 14px; }
       h1 { font-size: 16px; }
       .store, .muted { font-size: 12px; }
       .label { font-size: 11px; }
@@ -431,12 +437,13 @@ function paperCss(size) {
   }
   if (size === "58mm") {
     return `
-      @page { size: 58mm auto; margin: 2mm; }
-      body { width: 54mm; font-size: 13px; padding: 0; }
+      @page { size: 58mm auto; margin: 0; }
+      * { box-sizing: border-box; }
+      body { width: 58mm; padding: 0 2.5mm; font-size: 12px; }
       h1 { font-size: 14px; }
       .store, .muted { font-size: 11px; }
       .label { font-size: 10px; }
-      .row, .item { font-size: 15px; }
+      .row, .item { font-size: 14px; }
       .terms { font-size: 11px; }
       .sign-line { margin-top: 18px !important; font-size: 12px; }
     `;
