@@ -959,6 +959,7 @@ export default function Home() {
   const [uploadingImeiConsulta, setUploadingImeiConsulta] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(null); // null | "imei" | "numero_serie"
   const [scannerError, setScannerError] = useState("");
+  const [imeiConsultaNotice, setImeiConsultaNotice] = useState(false);
   const [canalFilter, setCanalFilter] = useState("todos"); // todos | balcao | empresa
   const [loteEmpresa, setLoteEmpresa] = useState("");
   const [loteTelefone, setLoteTelefone] = useState("");
@@ -1371,6 +1372,21 @@ export default function Home() {
     } finally {
       setUploadingImeiConsulta(false);
     }
+  }
+
+  async function consultarImei(imei) {
+    const valor = (imei || "").trim();
+    if (!valor) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(valor);
+      }
+    } catch (e) {
+      // segue mesmo se não conseguir copiar
+    }
+    setImeiConsultaNotice(true);
+    setTimeout(() => setImeiConsultaNotice(false), 4000);
+    window.open("https://www.ssp.sp.gov.br/servicos/consultar-celulares", "_blank", "noopener,noreferrer");
   }
 
   function daysSince(dateStr) {
@@ -1859,7 +1875,21 @@ export default function Home() {
               >
                 📷
               </button>
+              <button
+                type="button"
+                disabled={!(current.imei || "").trim()}
+                onClick={() => consultarImei(current.imei)}
+                className="shrink-0 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Copiar IMEI e abrir site de consulta (SSP-SP)"
+              >
+                🔎 Consultar
+              </button>
             </div>
+            {imeiConsultaNotice && (
+              <p className="text-xs text-emerald-400">
+                IMEI copiado! Cole no campo de busca do site que abriu e tire o print do resultado abaixo.
+              </p>
+            )}
             {(() => {
               const digits = (current.imei || "").trim();
               const dup =
