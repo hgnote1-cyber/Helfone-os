@@ -959,6 +959,15 @@ export default function Home() {
   const [uploadingImeiConsulta, setUploadingImeiConsulta] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(null); // null | "imei" | "numero_serie"
   const [scannerError, setScannerError] = useState("");
+  const [canalFilter, setCanalFilter] = useState("todos"); // todos | balcao | empresa
+  const [loteEmpresa, setLoteEmpresa] = useState("");
+  const [loteTelefone, setLoteTelefone] = useState("");
+  const [loteCnpj, setLoteCnpj] = useState("");
+  const [loteItens, setLoteItens] = useState([]);
+  const [loteSaving, setLoteSaving] = useState(false);
+  const [loteError, setLoteError] = useState("");
+  const [loteScanner, setLoteScanner] = useState(null); // null | { itemId, field }
+  const [loteScannerError, setLoteScannerError] = useState("");
   const initialStatusRef = useRef(null);
   const originRef = useRef("");
 
@@ -1064,6 +1073,102 @@ export default function Home() {
     setNewItemLabel("");
     setAutofillNotice("");
     setView("form");
+  }
+
+  function openColeta() {
+    setLoteEmpresa("");
+    setLoteTelefone("");
+    setLoteCnpj("");
+    setLoteItens([newLoteItem()]);
+    setLoteError("");
+    setView("coleta");
+  }
+
+  function newLoteItem() {
+    return {
+      id: uid(),
+      tipo: "Computador",
+      aparelho: "",
+      imei: "",
+      numero_serie: "",
+      defeito: "",
+      entry_photos: [],
+      uploading: false,
+    };
+  }
+
+  function addLoteItem() {
+    setLoteItens((itens) => [...itens, newLoteItem()]);
+  }
+
+  function removeLoteItem(id) {
+    setLoteItens((itens) => itens.filter((it) => it.id !== id));
+  }
+
+  function updateLoteItem(id, patch) {
+    setLoteItens((itens) => itens.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  }
+
+  async function addLoteItemPhoto(id, dataUrl) {
+    updateLoteItem(id, { uploading: true });
+    try {
+      const url = await uploadPhoto(dataUrl);
+      setLoteItens((itens) =>
+        itens.map((it) => (it.id === id ? { ...it, entry_photos: [...it.entry_photos, url], uploading: false } : it))
+      );
+    } catch (e) {
+      setLoteError("Não consegui enviar uma das fotos.");
+      updateLoteItem(id, { uploading: false });
+    }
+  }
+
+  async function saveLote() {
+    if (!loteEmpresa.trim()) {
+      setLoteError("Informe o nome da empresa.");
+      return;
+    }
+    const itensValidos = loteItens.filter((it) => it.aparelho.trim());
+    if (itensValidos.length === 0) {
+      setLoteError("Adicione pelo menos um aparelho com a descrição preenchida.");
+      return;
+    }
+    setLoteError("");
+    setLoteSaving(true);
+    try {
+      const lote_id = `L${Date.now()}`;
+      for (const it of itensValidos) {
+        const body = {
+          ...emptyOrder(),
+          cliente: loteEmpresa.trim(),
+          telefone: loteTelefone,
+          cnpj: loteCnpj,
+          aparelho: `${it.tipo}: ${it.aparelho.trim()}`,
+          imei: it.imei,
+          numero_serie: it.numero_serie,
+          defeito: it.defeito,
+          entry_photos: it.entry_photos,
+          canal: "empresa",
+          lote_id,
+          status_history: [{ status: "avaliacao", at: new Date().toISOString() }],
+        };
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Falha ao salvar um dos aparelhos.");
+        }
+      }
+      await load();
+      setCanalFilter("empresa");
+      setView("list");
+    } catch (e) {
+      setLoteError(e.message || "Não consegui salvar a coleta. Tente de novo.");
+    } finally {
+      setLoteSaving(false);
+    }
   }
 
   async function saveOrder() {
@@ -1318,6 +1423,9 @@ export default function Home() {
 
   const filtered = (orders || []).filter((o) => {
     const matchesFilter = filter === "todos" || o.status === filter;
+    const matchesCanal =
+      canalFilter === "todos" ||
+      (canalFilter === "empresa" ? o.canal === "empresa" : (o.canal || "balcao") !== "empresa");
     const hiddenByArchive =
       filter === "todos" && hideDelivered && (o.status === "entregue" || o.status === "cancelado");
     const q = query.trim().toLowerCase();
@@ -1332,8 +1440,20 @@ export default function Home() {
       (qDigits && (o.cnpj || "").replace(/\D/g, "").includes(qDigits)) ||
       (qDigits && (o.imei || "").includes(qDigits)) ||
       (o.numero_serie || "").toLowerCase().includes(q);
-    return matchesFilter && !hiddenByArchive && matchesQuery;
+    return matchesFilter && matchesCanal && !hiddenByArchive && matchesQuery;
   });
+
+  const loteGroups =
+    canalFilter === "empresa"
+      ? Object.values(
+          filtered.reduce((acc, o) => {
+            const key = o.lote_id || `sem-lote-${o.id}`;
+            if (!acc[key]) acc[key] = { lote_id: o.lote_id, cliente: o.cliente, created_at: o.created_at, itens: [] };
+            acc[key].itens.push(o);
+            return acc;
+          }, {})
+        ).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      : null;
 
   const counts = STATUS.reduce((acc, s) => {
     acc[s.id] = (orders || []).filter((o) => o.status === s.id).length;
@@ -1341,6 +1461,199 @@ export default function Home() {
   }, {});
 
   const waLink = current ? whatsappLink(current, originRef.current) : null;
+
+  if (view === "coleta") {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-10">
+        <div className="max-w-2xl mx-auto">
+          <div className="sticky top-0 bg-zinc-950 border-b border-zinc-800 px-4 py-3 flex items-center gap-3 z-10">
+            <button onClick={() => setView("list")} className="text-zinc-400 text-sm">
+              Cancelar
+            </button>
+            <h1 className="text-base font-medium flex-1 text-center">Coleta empresarial</h1>
+            <button
+              onClick={saveLote}
+              disabled={loteSaving}
+              className="text-amber-400 text-sm font-medium disabled:opacity-50"
+            >
+              {loteSaving ? "Salvando…" : "Salvar tudo"}
+            </button>
+          </div>
+
+          <div className="px-4 pt-4 space-y-5">
+            <p className="text-xs text-zinc-500">
+              Cadastre de uma vez todos os aparelhos recolhidos na visita. Cada um vira uma OS com número
+              próprio pra você avaliar individualmente depois, na loja.
+            </p>
+
+            {loteError && (
+              <div className="bg-red-950/40 border border-red-800 rounded-lg px-3 py-2.5 text-xs text-red-300">
+                {loteError}
+              </div>
+            )}
+
+            <section className="space-y-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">Empresa</p>
+              <input
+                placeholder="Nome da empresa"
+                value={loteEmpresa}
+                onChange={(e) => setLoteEmpresa(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+              />
+              <input
+                placeholder="Telefone / WhatsApp do contato"
+                value={loteTelefone}
+                onChange={(e) => setLoteTelefone(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+              />
+              <input
+                placeholder="CNPJ (opcional)"
+                inputMode="numeric"
+                value={loteCnpj}
+                onChange={(e) => setLoteCnpj(formatCnpj(e.target.value))}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+              />
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">
+                  Aparelhos ({loteItens.length})
+                </p>
+              </div>
+
+              {loteItens.map((it, idx) => (
+                <div key={it.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-500">Aparelho {idx + 1}</span>
+                    {loteItens.length > 1 && (
+                      <button
+                        onClick={() => removeLoteItem(it.id)}
+                        className="text-red-500 text-xs"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={it.tipo}
+                    onChange={(e) => updateLoteItem(it.id, { tipo: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-300 focus:outline-none focus:border-amber-500"
+                  >
+                    {["Computador", "Notebook", "Tablet", "Celular", "Outro"].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    placeholder="Modelo (ex: Dell i5, iPhone 12)"
+                    value={it.aparelho}
+                    onChange={(e) => updateLoteItem(it.id, { aparelho: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="IMEI (opcional)"
+                      inputMode="numeric"
+                      maxLength={17}
+                      value={it.imei}
+                      onChange={(e) =>
+                        updateLoteItem(it.id, { imei: e.target.value.replace(/[^0-9]/g, "") })
+                      }
+                      className="flex-1 min-w-0 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoteScannerError("");
+                        setLoteScanner({ itemId: it.id, field: "imei" });
+                      }}
+                      className="shrink-0 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm"
+                    >
+                      📷
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="Número de série (opcional)"
+                      value={it.numero_serie}
+                      onChange={(e) => updateLoteItem(it.id, { numero_serie: e.target.value })}
+                      className="flex-1 min-w-0 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoteScannerError("");
+                        setLoteScanner({ itemId: it.id, field: "numero_serie" });
+                      }}
+                      className="shrink-0 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm"
+                    >
+                      📷
+                    </button>
+                  </div>
+                  <textarea
+                    placeholder="Problema relatado (opcional, pode detalhar depois na avaliação)"
+                    value={it.defeito}
+                    onChange={(e) => updateLoteItem(it.id, { defeito: e.target.value })}
+                    rows={2}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500 resize-none"
+                  />
+                  <PhotoPicker
+                    label="Fotos de entrada"
+                    photos={it.entry_photos}
+                    uploading={it.uploading}
+                    onAdd={(dataUrl) => addLoteItemPhoto(it.id, dataUrl)}
+                    onView={setViewingPhoto}
+                    onRemove={(i) =>
+                      updateLoteItem(it.id, { entry_photos: it.entry_photos.filter((_, idx2) => idx2 !== i) })
+                    }
+                  />
+                </div>
+              ))}
+
+              <button
+                onClick={addLoteItem}
+                className="w-full border border-dashed border-zinc-700 text-zinc-400 text-sm py-2.5 rounded-lg"
+              >
+                + Adicionar aparelho
+              </button>
+            </section>
+          </div>
+
+          {viewingPhoto && (
+            <div
+              onClick={() => setViewingPhoto(null)}
+              className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+            >
+              <img src={viewingPhoto} alt="" className="max-w-full max-h-full rounded-lg object-contain" />
+              <button
+                onClick={() => setViewingPhoto(null)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-zinc-900 text-zinc-200 text-xl"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {loteScanner && (
+            <BarcodeScannerModal
+              target={loteScanner.field}
+              onClose={() => setLoteScanner(null)}
+              onResult={(text) => {
+                updateLoteItem(loteScanner.itemId, {
+                  [loteScanner.field]: loteScanner.field === "imei" ? text.replace(/[^0-9]/g, "") : text,
+                });
+                setLoteScanner(null);
+              }}
+              onError={setLoteScannerError}
+              error={loteScannerError}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (view === "form" && current) {
     return (
@@ -1998,6 +2311,12 @@ export default function Home() {
               </button>
             )}
             <button
+              onClick={openColeta}
+              className="border border-zinc-700 text-zinc-300 text-sm font-medium px-3 py-1.5 rounded-lg"
+            >
+              🏢 Coleta
+            </button>
+            <button
               onClick={openNew}
               className="bg-amber-500 text-zinc-950 text-sm font-medium px-3 py-1.5 rounded-lg"
             >
@@ -2038,6 +2357,25 @@ export default function Home() {
               Exportar CSV
             </button>
           </div>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 mb-2">
+          {[
+            { id: "todos", label: "Todos" },
+            { id: "balcao", label: "Balcão" },
+            { id: "empresa", label: "🏢 Empresas" },
+          ].map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCanalFilter(c.id)}
+              className={`shrink-0 text-xs px-3 py-1.5 rounded-full border ${
+                canalFilter === c.id
+                  ? "bg-amber-500 text-zinc-950 border-amber-500"
+                  : "border-zinc-700 text-zinc-400"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
           <button
@@ -2093,61 +2431,78 @@ export default function Home() {
         )}
 
         <div className="space-y-2">
-          {filtered.map((o) => {
-            const s = statusInfo(o.status);
-            const checkedCount = (o.checklist || []).filter((c) => c.checked).length;
-            const totalCount = (o.checklist || []).length;
-            return (
-              <div
-                key={o.id}
-                onClick={() => openEdit(o)}
-                className={`bg-zinc-900 border border-zinc-800 border-l-4 ${s.border} rounded-lg px-3 py-3 cursor-pointer`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono text-xs text-zinc-500">OS #{o.numero}</span>
-                  <span className={`text-xs ${s.text}`}>{s.label}</span>
-                </div>
-                <p className="text-sm font-medium">{o.cliente}</p>
-                <p className="text-xs text-zinc-500">{o.aparelho}</p>
-                {o.orcamento_aprovado && (
-                  <p className="text-xs text-emerald-400">✓ Orçamento aprovado</p>
-                )}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-500">
-                  {o.orcamento && <span>Orçamento: R$ {o.orcamento}</span>}
-                  {totalCount > 0 && (
-                    <span>
-                      Checklist: {checkedCount}/{totalCount}
+          {(() => {
+            const renderCard = (o) => {
+              const s = statusInfo(o.status);
+              const checkedCount = (o.checklist || []).filter((c) => c.checked).length;
+              const totalCount = (o.checklist || []).length;
+              return (
+                <div
+                  key={o.id}
+                  onClick={() => openEdit(o)}
+                  className={`bg-zinc-900 border border-zinc-800 border-l-4 ${s.border} rounded-lg px-3 py-3 cursor-pointer`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono text-xs text-zinc-500">
+                      OS #{o.numero} {o.canal === "empresa" && <span className="text-zinc-500">🏢</span>}
                     </span>
+                    <span className={`text-xs ${s.text}`}>{s.label}</span>
+                  </div>
+                  <p className="text-sm font-medium">{o.cliente}</p>
+                  <p className="text-xs text-zinc-500">{o.aparelho}</p>
+                  {o.orcamento_aprovado && (
+                    <p className="text-xs text-emerald-400">✓ Orçamento aprovado</p>
                   )}
-                  {(o.entry_photos?.length > 0 || o.exit_photos?.length > 0) && (
-                    <span>
-                      Fotos: {o.entry_photos?.length || 0} entrada, {o.exit_photos?.length || 0} saída
-                    </span>
-                  )}
-                  {o.status !== "entregue" && daysSince(lastStatusChangeDate(o)) >= 5 && (
-                    <span className="text-amber-400">
-                      ⏰ Parada há {daysSince(lastStatusChangeDate(o))}d
-                    </span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-500">
+                    {o.orcamento && <span>Orçamento: R$ {o.orcamento}</span>}
+                    {totalCount > 0 && (
+                      <span>
+                        Checklist: {checkedCount}/{totalCount}
+                      </span>
+                    )}
+                    {(o.entry_photos?.length > 0 || o.exit_photos?.length > 0) && (
+                      <span>
+                        Fotos: {o.entry_photos?.length || 0} entrada, {o.exit_photos?.length || 0} saída
+                      </span>
+                    )}
+                    {o.status !== "entregue" && daysSince(lastStatusChangeDate(o)) >= 5 && (
+                      <span className="text-amber-400">
+                        ⏰ Parada há {daysSince(lastStatusChangeDate(o))}d
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 mt-2 overflow-x-auto">
+                    {STATUS.map((st) => (
+                      <button
+                        key={st.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setStatusQuick(o, st.id);
+                        }}
+                        className={`shrink-0 w-2.5 h-2.5 rounded-full ${st.dot} ${
+                          o.status === st.id ? "ring-2 ring-offset-1 ring-offset-zinc-900 ring-zinc-100" : "opacity-40"
+                        }`}
+                        title={st.label}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-1.5 mt-2 overflow-x-auto">
-                  {STATUS.map((st) => (
-                    <button
-                      key={st.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setStatusQuick(o, st.id);
-                      }}
-                      className={`shrink-0 w-2.5 h-2.5 rounded-full ${st.dot} ${
-                        o.status === st.id ? "ring-2 ring-offset-1 ring-offset-zinc-900 ring-zinc-100" : "opacity-40"
-                      }`}
-                      title={st.label}
-                    />
-                  ))}
+              );
+            };
+
+            if (loteGroups) {
+              return loteGroups.map((g) => (
+                <div key={g.lote_id || g.itens[0]?.id} className="space-y-2">
+                  <p className="text-xs text-zinc-500 pt-2 first:pt-0">
+                    🏢 {g.cliente} — {g.itens.length} {g.itens.length === 1 ? "aparelho" : "aparelhos"}
+                    {g.created_at ? ` · ${new Date(g.created_at).toLocaleDateString("pt-BR")}` : ""}
+                  </p>
+                  {g.itens.map(renderCard)}
                 </div>
-              </div>
-            );
-          })}
+              ));
+            }
+            return filtered.map(renderCard);
+          })()}
         </div>
       </div>
 

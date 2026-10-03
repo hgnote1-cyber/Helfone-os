@@ -31,6 +31,8 @@ export async function POST(req) {
       cpf: body.cpf || "",
       cnpj: body.cnpj || "",
       aparelho: body.aparelho,
+      canal: body.canal || "balcao",
+      lote_id: body.lote_id || null,
       imei: body.imei || "",
       numero_serie: body.numero_serie || "",
       imei_conferencia_data: body.imei_conferencia_data || null,

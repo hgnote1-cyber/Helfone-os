@@ -77,3 +77,10 @@ alter table ordens add column if not exists imei_consulta_fotos jsonb default '[
 
 -- Indice para acelerar a busca de IMEI repetido entre OS
 create index if not exists ordens_imei_idx on ordens (imei) where imei is not null and imei <> '';
+
+-- Coleta empresarial (B2B): varios aparelhos da mesma empresa cadastrados de uma vez,
+-- cada um com sua propria OS, agrupados por lote_id para avaliacao individual depois.
+alter table ordens add column if not exists canal text default 'balcao';
+alter table ordens add column if not exists lote_id text;
+
+create index if not exists ordens_lote_id_idx on ordens (lote_id) where lote_id is not null;
