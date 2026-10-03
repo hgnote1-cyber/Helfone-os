@@ -24,6 +24,16 @@ const DEFAULT_CHECKLIST = [
 
 const MAX_PHOTOS = 6;
 
+const IMEI_RESULTADO = [
+  { id: "registrado_entrada", label: "Registrado na entrada", dot: "bg-zinc-400" },
+  { id: "sem_restricao", label: "Sem restrição", dot: "bg-emerald-500" },
+  { id: "suspeito", label: "Suspeito", dot: "bg-red-500" },
+];
+
+function imeiResultadoInfo(id) {
+  return IMEI_RESULTADO.find((r) => r.id === id) || null;
+}
+
 function statusInfo(id) {
   return STATUS.find((s) => s.id === id) || STATUS[0];
 }
@@ -42,6 +52,14 @@ function emptyOrder() {
     cnpj: "",
     aparelho: "",
     imei: "",
+    numero_serie: "",
+    imei_conferencia_data: "",
+    imei_conferido_por: "",
+    imei_resultado: "",
+    imei_documento_apresentado: false,
+    imei_obs: "",
+    imei_consulta_resultado: "",
+    imei_consulta_fotos: [],
     defeito: "",
     senha: "",
     orcamento: "",
@@ -151,10 +169,25 @@ function whatsappLink(order, origin) {
 }
 
 function exportCsv(orders) {
-  const headers = ["numero", "cliente", "telefone", "cpf", "cnpj", "aparelho", "imei", "defeito", "status", "orcamento", "tecnico", "criado_em"];
+  const headers = ["numero", "cliente", "telefone", "cpf", "cnpj", "aparelho", "imei", "numero_serie", "imei_resultado", "defeito", "status", "orcamento", "tecnico", "criado_em"];
   const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = orders.map((o) =>
-    [o.numero, o.cliente, o.telefone, o.cpf, o.cnpj, o.aparelho, o.imei, o.defeito, statusInfo(o.status).label, o.orcamento, o.tecnico, o.created_at]
+    [
+      o.numero,
+      o.cliente,
+      o.telefone,
+      o.cpf,
+      o.cnpj,
+      o.aparelho,
+      o.imei,
+      o.numero_serie,
+      imeiResultadoInfo(o.imei_resultado)?.label || "",
+      o.defeito,
+      statusInfo(o.status).label,
+      o.orcamento,
+      o.tecnico,
+      o.created_at,
+    ]
       .map(escape)
       .join(",")
   );
@@ -226,6 +259,7 @@ function buildReceiptText(order, variant) {
   lines.push("APARELHO");
   lines.push(order.aparelho || "");
   if (order.imei) lines.push(`IMEI: ${order.imei}`);
+  if (order.numero_serie) lines.push(`Serie: ${order.numero_serie}`);
   lines.push(order.defeito || "");
   lines.push(sep);
   lines.push("CHECKLIST");
@@ -313,9 +347,41 @@ function buildPaymentReceiptText(order) {
   return lines.join("\n");
 }
 
+function buildImeiProofText(order) {
+  const eq = "================================";
+  const lines = [];
+  lines.push(...storeHeaderLines());
+  lines.push("COMPROVANTE DE CONFERENCIA DE IMEI");
+  lines.push(eq);
+  const now = new Date();
+  const { data: dataStr, hora: horaStr } = formatDateBR(now);
+  lines.push(`Cupom No: ${order.numero}  Data: ${dataStr} ${horaStr}`);
+  lines.push(`Cliente: ${order.cliente || "Cliente Avulso"}`);
+  lines.push(eq);
+  lines.push(`Aparelho: ${order.aparelho || "-"}`);
+  if (order.imei) lines.push(`IMEI: ${order.imei}`);
+  if (order.numero_serie) lines.push(`Serie: ${order.numero_serie}`);
+  lines.push(eq);
+  lines.push(`RESULTADO: ${imeiResultadoInfo(order.imei_resultado)?.label || "Nao registrado"}`);
+  lines.push(`Conferido por: ${order.imei_conferido_por || "-"}`);
+  if (order.imei_conferencia_data) {
+    const { data: cd, hora: ch } = formatDateBR(new Date(order.imei_conferencia_data));
+    lines.push(`Data/hora: ${cd} ${ch}`);
+  }
+  lines.push(`Documento apresentado: ${order.imei_documento_apresentado ? "Sim" : "Nao"}`);
+  if (order.imei_consulta_resultado) lines.push(`Consulta externa: ${order.imei_consulta_resultado}`);
+  if (order.imei_obs) lines.push(`Obs: ${order.imei_obs}`);
+  lines.push(eq);
+  return lines.join("\n");
+}
+
 function printThermalDirect(order, variant) {
   const text =
-    variant === "pagamento" ? buildPaymentReceiptText(order) : buildReceiptText(order, variant);
+    variant === "pagamento"
+      ? buildPaymentReceiptText(order)
+      : variant === "imei"
+      ? buildImeiProofText(order)
+      : buildReceiptText(order, variant);
   const b64 = btoa(unescape(encodeURIComponent(text)));
   window.location.href = `rawbt:base64,${b64}`;
 }
@@ -507,6 +573,7 @@ function printCustomerReceipt(order, size = "a4") {
         <div class="label">Aparelho</div>
         <div>${order.aparelho || ""}</div>
         ${order.imei ? `<div>IMEI: ${order.imei}</div>` : ""}
+        ${order.numero_serie ? `<div>Nº de série: ${order.numero_serie}</div>` : ""}
       </div>
 
       <div class="section">
@@ -587,8 +654,27 @@ function printOrder(order, size = "a4") {
         <div class="label">Aparelho</div>
         <div>${order.aparelho || ""}</div>
         ${order.imei ? `<div>IMEI: ${order.imei}</div>` : ""}
+        ${order.numero_serie ? `<div>Nº de série: ${order.numero_serie}</div>` : ""}
         <div>${(order.defeito || "").replace(/\n/g, "<br/>")}</div>
       </div>
+
+      ${
+        order.imei || order.numero_serie
+          ? `<div class="section">
+        <div class="label">Conferência de IMEI/Série na entrada</div>
+        <div>Resultado: ${imeiResultadoInfo(order.imei_resultado)?.label || "Não registrado"}</div>
+        ${order.imei_conferido_por ? `<div>Conferido por: ${order.imei_conferido_por}</div>` : ""}
+        ${
+          order.imei_conferencia_data
+            ? `<div>Data/hora: ${new Date(order.imei_conferencia_data).toLocaleString("pt-BR")}</div>`
+            : ""
+        }
+        <div>Documento/nota do aparelho apresentado: ${order.imei_documento_apresentado ? "Sim" : "Não"}</div>
+        ${order.imei_consulta_resultado ? `<div>Consulta externa: ${order.imei_consulta_resultado}</div>` : ""}
+        ${order.imei_obs ? `<div>Obs.: ${order.imei_obs}</div>` : ""}
+      </div>`
+          : ""
+      }
 
       <div class="section">
         <div class="label">Checklist</div>
@@ -604,6 +690,101 @@ function printOrder(order, size = "a4") {
         <div class="label">Observações</div>
         <div>${(order.obs || "-").replace(/\n/g, "<br/>")}</div>
       </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 250);
+}
+
+function printImeiProof(order, size = "a4") {
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
+    return;
+  }
+  const { data: dataStr, hora: horaStr } = formatDateBR(new Date());
+  const conferenciaData = order.imei_conferencia_data
+    ? formatDateBR(new Date(order.imei_conferencia_data))
+    : null;
+  win.document.write(`
+    <html>
+    <head>
+      <title>OS #${order.numero} - Comprovante de conferência de IMEI</title>
+      <meta charset="utf-8" />
+      <style>
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #000; margin: 0; font-weight: normal; }
+        .titulo {
+          text-align: center;
+          font-weight: bold;
+          font-size: 14px;
+          letter-spacing: 0.5px;
+          border-top: 1px dashed #333;
+          border-bottom: 1px dashed #333;
+          padding: 6px 0;
+          margin: 10px 0;
+        }
+        .eq { border-top: 1px dashed #333; margin: 8px 0; }
+        .label { font-size: 11px; text-transform: uppercase; color: #333; margin-bottom: 2px; font-weight: 600; }
+        .linha { margin-bottom: 6px; }
+        .resultado {
+          text-align: center;
+          font-weight: bold;
+          font-size: 15px;
+          border: 1px solid #000;
+          padding: 6px;
+          margin: 10px 0;
+        }
+        .rodape { text-align: center; font-size: 11px; color: #666; margin-top: 14px; }
+        ${paperCss(size)}
+      </style>
+    </head>
+    <body>
+      ${storeHeaderHtml()}
+
+      <div class="titulo">COMPROVANTE DE CONFERÊNCIA DE IMEI</div>
+
+      <div class="linha">Cupom No: ${order.numero}&nbsp;&nbsp;Data: ${dataStr} ${horaStr}</div>
+      <div class="linha">Cliente: ${order.cliente || "Cliente Avulso"}</div>
+      ${order.cpf ? `<div class="linha">CPF: ${order.cpf}</div>` : ""}
+      ${order.cnpj ? `<div class="linha">CNPJ: ${order.cnpj}</div>` : ""}
+      <div class="eq"></div>
+
+      <div class="label">Aparelho</div>
+      <div class="linha">${order.aparelho || "-"}</div>
+      ${order.imei ? `<div class="linha">IMEI: ${order.imei}</div>` : ""}
+      ${order.numero_serie ? `<div class="linha">Nº de série: ${order.numero_serie}</div>` : ""}
+      <div class="eq"></div>
+
+      <div class="resultado">${imeiResultadoInfo(order.imei_resultado)?.label || "Não registrado"}</div>
+
+      <div class="label">Conferido por</div>
+      <div class="linha">${order.imei_conferido_por || "-"}</div>
+
+      <div class="label">Data/hora da conferência</div>
+      <div class="linha">${conferenciaData ? `${conferenciaData.data} ${conferenciaData.hora}` : "-"}</div>
+
+      <div class="label">Documento/nota do aparelho apresentado</div>
+      <div class="linha">${order.imei_documento_apresentado ? "Sim" : "Não"}</div>
+
+      ${
+        order.imei_consulta_resultado
+          ? `<div class="label">Resultado da consulta externa</div><div class="linha">${order.imei_consulta_resultado}</div>`
+          : ""
+      }
+
+      ${order.imei_obs ? `<div class="label">Observação</div><div class="linha">${order.imei_obs}</div>` : ""}
+
+      ${
+        (order.imei_consulta_fotos || []).length > 0
+          ? `<div class="eq"></div><div class="label">Print da consulta anexado</div><div class="linha">${order.imei_consulta_fotos.length} imagem(ns) salva(s) no sistema</div>`
+          : ""
+      }
+
+      <div class="eq"></div>
+      <div class="rodape">Documento interno da loja — conferência realizada na entrada do aparelho.</div>
     </body>
     </html>
   `);
@@ -676,6 +857,85 @@ function PhotoPicker({ label, photos, onAdd, onRemove, onView, uploading }) {
   );
 }
 
+function BarcodeScannerModal({ target, onClose, onResult, onError, error }) {
+  const regionId = "barcode-scanner-region";
+  const scannerRef = useRef(null);
+  const [status, setStatus] = useState("iniciando"); // iniciando | lendo | erro
+
+  useEffect(() => {
+    let cancelled = false;
+    let instance = null;
+
+    async function start() {
+      try {
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+        if (cancelled) return;
+        instance = new Html5Qrcode(regionId, {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.QR_CODE,
+          ],
+          verbose: false,
+        });
+        scannerRef.current = instance;
+        await instance.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 260, height: 160 } },
+          (decodedText) => {
+            if (cancelled) return;
+            onResult(decodedText);
+          },
+          () => {} // erro de leitura de 1 frame, ignora
+        );
+        if (!cancelled) setStatus("lendo");
+      } catch (e) {
+        if (!cancelled) {
+          setStatus("erro");
+          onError(
+            "Não consegui abrir a câmera. Verifique a permissão de câmera do navegador e tente de novo."
+          );
+        }
+      }
+    }
+
+    start();
+
+    return () => {
+      cancelled = true;
+      if (instance) {
+        instance.stop().then(() => instance.clear()).catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 w-full max-w-sm space-y-3">
+        <p className="text-sm text-zinc-300 text-center">
+          Aponte a câmera pro código de barras {target === "imei" ? "do IMEI" : "do número de série"}
+        </p>
+        <div id={regionId} className="rounded-lg overflow-hidden bg-black" />
+        {error && <p className="text-xs text-red-400 text-center">{error}</p>}
+        {status === "iniciando" && !error && (
+          <p className="text-xs text-zinc-500 text-center">Abrindo a câmera…</p>
+        )}
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-lg bg-zinc-800 text-zinc-300 text-sm"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [orders, setOrders] = useState(null);
   const [view, setView] = useState("list");
@@ -696,6 +956,9 @@ export default function Home() {
   const [pushStatus, setPushStatus] = useState("checking"); // checking | off | on | unsupported
   const [metaFaturamento, setMetaFaturamento] = useState("");
   const [metaInput, setMetaInput] = useState("");
+  const [uploadingImeiConsulta, setUploadingImeiConsulta] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(null); // null | "imei" | "numero_serie"
+  const [scannerError, setScannerError] = useState("");
   const initialStatusRef = useRef(null);
   const originRef = useRef("");
 
@@ -830,7 +1093,17 @@ export default function Home() {
         : baseHistory.length > 0
         ? baseHistory
         : [{ status: current.status, at: new Date().toISOString() }];
-      const payload = { ...current, status_history };
+      const hasConferenciaImei =
+        current.imei_resultado ||
+        current.imei_documento_apresentado ||
+        (current.imei_obs || "").trim() ||
+        (current.imei_consulta_resultado || "").trim() ||
+        (current.imei_consulta_fotos || []).length > 0;
+      const imei_conferencia_data =
+        hasConferenciaImei && !current.imei_conferencia_data
+          ? new Date().toISOString()
+          : current.imei_conferencia_data;
+      const payload = { ...current, status_history, imei_conferencia_data };
 
       let res;
       if (current.id) {
@@ -983,6 +1256,18 @@ export default function Home() {
     }
   }
 
+  async function addImeiConsultaPhoto(dataUrl) {
+    setUploadingImeiConsulta(true);
+    try {
+      const url = await uploadPhoto(dataUrl);
+      setCurrent((c) => ({ ...c, imei_consulta_fotos: [...(c.imei_consulta_fotos || []), url] }));
+    } catch (e) {
+      setError("Não consegui enviar o print da consulta.");
+    } finally {
+      setUploadingImeiConsulta(false);
+    }
+  }
+
   function daysSince(dateStr) {
     if (!dateStr) return 0;
     return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
@@ -1045,7 +1330,8 @@ export default function Home() {
       (qDigits && (o.telefone || "").replace(/\D/g, "").includes(qDigits)) ||
       (qDigits && (o.cpf || "").replace(/\D/g, "").includes(qDigits)) ||
       (qDigits && (o.cnpj || "").replace(/\D/g, "").includes(qDigits)) ||
-      (qDigits && (o.imei || "").includes(qDigits));
+      (qDigits && (o.imei || "").includes(qDigits)) ||
+      (o.numero_serie || "").toLowerCase().includes(q);
     return matchesFilter && !hiddenByArchive && matchesQuery;
   });
 
@@ -1098,6 +1384,14 @@ export default function Home() {
                 Via do cliente (assinar)
               </button>
             </div>
+            {(current.imei || current.numero_serie) && (
+              <button
+                onClick={() => setPrintChoice("imei")}
+                className="w-full border border-zinc-700 text-zinc-300 text-sm py-2 rounded-lg"
+              >
+                Comprovante de conferência de IMEI
+              </button>
+            )}
             <div className="flex gap-2">
               {waLink ? (
                 <button
@@ -1232,14 +1526,61 @@ export default function Home() {
               onChange={(e) => setCurrent({ ...current, aparelho: e.target.value })}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
-            <input
-              placeholder="IMEI (só para celulares)"
-              inputMode="numeric"
-              maxLength={17}
-              value={current.imei}
-              onChange={(e) => setCurrent({ ...current, imei: e.target.value.replace(/[^0-9]/g, "") })}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
-            />
+            <div className="flex gap-2">
+              <input
+                placeholder="IMEI (só para celulares)"
+                inputMode="numeric"
+                maxLength={17}
+                value={current.imei}
+                onChange={(e) => setCurrent({ ...current, imei: e.target.value.replace(/[^0-9]/g, "") })}
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerError("");
+                  setScannerOpen("imei");
+                }}
+                className="shrink-0 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm"
+                title="Ler pela câmera"
+              >
+                📷
+              </button>
+            </div>
+            {(() => {
+              const digits = (current.imei || "").trim();
+              const dup =
+                digits.length >= 6
+                  ? (orders || []).find((o) => o.id !== current.id && (o.imei || "").trim() === digits)
+                  : null;
+              if (!dup) return null;
+              return (
+                <div className="bg-red-950/40 border border-red-800 rounded-lg px-3 py-2.5 text-xs text-red-300">
+                  ⚠ Esse IMEI já está cadastrado na OS #{dup.numero}
+                  {dup.cliente ? ` (${dup.cliente})` : ""} de{" "}
+                  {dup.created_at ? new Date(dup.created_at).toLocaleDateString("pt-BR") : "data desconhecida"}.
+                </div>
+              );
+            })()}
+            <div className="flex gap-2">
+              <input
+                placeholder="Número de série (opcional, para notebooks etc.)"
+                value={current.numero_serie}
+                onChange={(e) => setCurrent({ ...current, numero_serie: e.target.value })}
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerError("");
+                  setScannerOpen("numero_serie");
+                }}
+                className="shrink-0 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm"
+                title="Ler pela câmera"
+              >
+                📷
+              </button>
+            </div>
             <textarea
               placeholder="Defeito relatado pelo cliente"
               value={current.defeito}
@@ -1253,6 +1594,80 @@ export default function Home() {
               onChange={(e) => setCurrent({ ...current, senha: e.target.value })}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
+          </section>
+
+          <section className="space-y-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">
+              Conferência de IMEI/Série (entrada do aparelho)
+            </p>
+            <select
+              value={current.imei_resultado}
+              onChange={(e) => setCurrent({ ...current, imei_resultado: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-300 focus:outline-none focus:border-amber-500"
+            >
+              <option value="">Resultado da conferência…</option>
+              {IMEI_RESULTADO.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <input
+              placeholder="Conferido por (quem atendeu)"
+              value={current.imei_conferido_por}
+              onChange={(e) => setCurrent({ ...current, imei_conferido_por: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+            />
+            <label className="flex items-center gap-2.5 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrent({
+                    ...current,
+                    imei_documento_apresentado: !current.imei_documento_apresentado,
+                  })
+                }
+                className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                  current.imei_documento_apresentado
+                    ? "bg-amber-500 border-amber-500 text-zinc-950"
+                    : "border-zinc-600 text-transparent"
+                }`}
+              >
+                ✓
+              </button>
+              <span className="flex-1 text-sm text-zinc-400">Documento ou nota do aparelho apresentado</span>
+            </label>
+            <textarea
+              placeholder="Observação sobre a conferência (opcional)"
+              value={current.imei_obs}
+              onChange={(e) => setCurrent({ ...current, imei_obs: e.target.value })}
+              rows={2}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500 resize-none"
+            />
+            <input
+              placeholder="Resultado da consulta no site de IMEI (ex: sem registro de furto/roubo)"
+              value={current.imei_consulta_resultado}
+              onChange={(e) => setCurrent({ ...current, imei_consulta_resultado: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+            />
+            <PhotoPicker
+              label="Print da consulta de IMEI"
+              photos={current.imei_consulta_fotos || []}
+              uploading={uploadingImeiConsulta}
+              onAdd={addImeiConsultaPhoto}
+              onView={setViewingPhoto}
+              onRemove={(i) =>
+                setCurrent({
+                  ...current,
+                  imei_consulta_fotos: (current.imei_consulta_fotos || []).filter((_, idx) => idx !== i),
+                })
+              }
+            />
+            {current.imei_conferencia_data && (
+              <p className="text-xs text-zinc-600">
+                Conferido em {new Date(current.imei_conferencia_data).toLocaleString("pt-BR")}
+              </p>
+            )}
           </section>
 
           <section className="space-y-2">
@@ -1510,6 +1925,8 @@ export default function Home() {
                       printOrder(current, opt.id);
                     } else if (printChoice === "pagamento") {
                       printPaymentReceipt(current, opt.id);
+                    } else if (printChoice === "imei") {
+                      printImeiProof(current, opt.id);
                     } else {
                       printCustomerReceipt(current, opt.id);
                     }
@@ -1543,6 +1960,22 @@ export default function Home() {
               ×
             </button>
           </div>
+        )}
+
+        {scannerOpen && (
+          <BarcodeScannerModal
+            target={scannerOpen}
+            onClose={() => setScannerOpen(null)}
+            onResult={(text) => {
+              setCurrent((c) => ({
+                ...c,
+                [scannerOpen]: scannerOpen === "imei" ? text.replace(/[^0-9]/g, "") : text,
+              }));
+              setScannerOpen(null);
+            }}
+            onError={setScannerError}
+            error={scannerError}
+          />
         )}
         </div>
       </div>

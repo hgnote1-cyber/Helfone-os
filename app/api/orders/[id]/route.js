@@ -13,6 +13,14 @@ export async function PUT(req, { params }) {
       cnpj: body.cnpj || "",
       aparelho: body.aparelho,
       imei: body.imei || "",
+      numero_serie: body.numero_serie || "",
+      imei_conferencia_data: body.imei_conferencia_data || null,
+      imei_conferido_por: body.imei_conferido_por || "",
+      imei_resultado: body.imei_resultado || "",
+      imei_documento_apresentado: body.imei_documento_apresentado || false,
+      imei_obs: body.imei_obs || "",
+      imei_consulta_resultado: body.imei_consulta_resultado || "",
+      imei_consulta_fotos: body.imei_consulta_fotos || [],
       defeito: body.defeito || "",
       senha: body.senha || "",
       orcamento: body.orcamento || "",
@@ -44,11 +52,15 @@ export async function PUT(req, { params }) {
 export async function DELETE(req, { params }) {
   const { data: order } = await supabaseAdmin
     .from("ordens")
-    .select("entry_photos, exit_photos")
+    .select("entry_photos, exit_photos, imei_consulta_fotos")
     .eq("id", params.id)
     .single();
 
-  const allUrls = [...(order?.entry_photos || []), ...(order?.exit_photos || [])];
+  const allUrls = [
+    ...(order?.entry_photos || []),
+    ...(order?.exit_photos || []),
+    ...(order?.imei_consulta_fotos || []),
+  ];
   const marker = "/fotos/";
   const paths = allUrls
     .map((url) => {
