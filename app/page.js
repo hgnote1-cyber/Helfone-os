@@ -1386,7 +1386,11 @@ export default function Home() {
     }
     setImeiConsultaNotice(true);
     setTimeout(() => setImeiConsultaNotice(false), 4000);
-    window.open("https://www.ssp.sp.gov.br/servicos/consultar-celulares", "_blank", "noopener,noreferrer");
+    window.open(
+      "https://www.consultaaparelhoimpedido.com.br/public-web/home?cid=2574026",
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   function daysSince(dateStr) {
@@ -1880,7 +1884,7 @@ export default function Home() {
                 disabled={!(current.imei || "").trim()}
                 onClick={() => consultarImei(current.imei)}
                 className="shrink-0 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Copiar IMEI e abrir site de consulta (SSP-SP)"
+                title="Copiar IMEI e abrir site de consulta de aparelho impedido"
               >
                 🔎 Consultar
               </button>
