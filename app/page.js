@@ -60,6 +60,7 @@ function emptyOrder() {
     imei_obs: "",
     imei_consulta_resultado: "",
     imei_consulta_fotos: [],
+    docs_assinados: [],
     defeito: "",
     contato_liquido: false,
     limpeza_valor: "",
@@ -1239,6 +1240,7 @@ export default function Home() {
   const [metaFaturamento, setMetaFaturamento] = useState("");
   const [metaInput, setMetaInput] = useState("");
   const [uploadingImeiConsulta, setUploadingImeiConsulta] = useState(false);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(null); // null | "imei" | "numero_serie"
   const [scannerError, setScannerError] = useState("");
   const [imeiConsultaNotice, setImeiConsultaNotice] = useState(false);
@@ -1641,6 +1643,18 @@ export default function Home() {
       setError("Não consegui enviar a foto.");
     } finally {
       setUploadingExit(false);
+    }
+  }
+
+  async function addDocAssinadoPhoto(dataUrl) {
+    setUploadingDocs(true);
+    try {
+      const url = await uploadPhoto(dataUrl);
+      setCurrent((c) => ({ ...c, docs_assinados: [...(c.docs_assinados || []), url] }));
+    } catch (e) {
+      setError("Não consegui enviar a foto do documento assinado.");
+    } finally {
+      setUploadingDocs(false);
     }
   }
 
@@ -2403,6 +2417,17 @@ export default function Home() {
             }
           />
 
+          <PhotoPicker
+            label="Documentos assinados (foto do termo/nota de entrada e saída)"
+            photos={current.docs_assinados || []}
+            uploading={uploadingDocs}
+            onAdd={addDocAssinadoPhoto}
+            onView={setViewingPhoto}
+            onRemove={(i) =>
+              setCurrent({ ...current, docs_assinados: (current.docs_assinados || []).filter((_, idx) => idx !== i) })
+            }
+          />
+
           <section className="space-y-3">
             <p className="text-xs uppercase tracking-wide text-zinc-500">Entrega do aparelho (termo de saída)</p>
             <select
@@ -2851,9 +2876,9 @@ export default function Home() {
                         Checklist: {checkedCount}/{totalCount}
                       </span>
                     )}
-                    {(o.entry_photos?.length > 0 || o.exit_photos?.length > 0) && (
+                    {(o.entry_photos?.length > 0 || o.exit_photos?.length > 0 || o.docs_assinados?.length > 0) && (
                       <span>
-                        Fotos: {o.entry_photos?.length || 0} entrada, {o.exit_photos?.length || 0} saída
+                        Fotos: {o.entry_photos?.length || 0} entrada, {o.exit_photos?.length || 0} saída{o.docs_assinados?.length > 0 ? `, ${o.docs_assinados.length} assinado(s)` : ""}
                       </span>
                     )}
                     {o.status !== "entregue" && daysSince(lastStatusChangeDate(o)) >= 5 && (

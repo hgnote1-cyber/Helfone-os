@@ -23,6 +23,7 @@ export async function PUT(req, { params }) {
       imei_obs: body.imei_obs || "",
       imei_consulta_resultado: body.imei_consulta_resultado || "",
       imei_consulta_fotos: body.imei_consulta_fotos || [],
+      docs_assinados: body.docs_assinados || [],
       defeito: body.defeito || "",
       contato_liquido: body.contato_liquido || false,
       limpeza_valor: body.limpeza_valor || "",
@@ -59,7 +60,7 @@ export async function PUT(req, { params }) {
 export async function DELETE(req, { params }) {
   const { data: order } = await supabaseAdmin
     .from("ordens")
-    .select("entry_photos, exit_photos, imei_consulta_fotos")
+    .select("entry_photos, exit_photos, imei_consulta_fotos, docs_assinados")
     .eq("id", params.id)
     .single();
 
@@ -67,6 +68,7 @@ export async function DELETE(req, { params }) {
     ...(order?.entry_photos || []),
     ...(order?.exit_photos || []),
     ...(order?.imei_consulta_fotos || []),
+    ...(order?.docs_assinados || []),
   ];
   const marker = "/fotos/";
   const paths = allUrls

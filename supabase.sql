@@ -93,3 +93,6 @@ alter table ordens add column if not exists limpeza_valor text;
 alter table ordens add column if not exists saida_tipo text;
 alter table ordens add column if not exists saida_servicos text;
 alter table ordens add column if not exists saida_valor_devido text;
+
+-- Fotos dos documentos assinados (termos de entrada/saida)
+alter table ordens add column if not exists docs_assinados jsonb default '[]';

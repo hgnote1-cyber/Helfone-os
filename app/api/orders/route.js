@@ -42,6 +42,7 @@ export async function POST(req) {
       imei_obs: body.imei_obs || "",
       imei_consulta_resultado: body.imei_consulta_resultado || "",
       imei_consulta_fotos: body.imei_consulta_fotos || [],
+      docs_assinados: body.docs_assinados || [],
       defeito: body.defeito || "",
       contato_liquido: body.contato_liquido || false,
       limpeza_valor: body.limpeza_valor || "",
