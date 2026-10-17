@@ -84,3 +84,7 @@ alter table ordens add column if not exists canal text default 'balcao';
 alter table ordens add column if not exists lote_id text;
 
 create index if not exists ordens_lote_id_idx on ordens (lote_id) where lote_id is not null;
+
+-- Aparelho com contato com agua/liquido: termo de limpeza na via de entrada
+alter table ordens add column if not exists contato_liquido boolean default false;
+alter table ordens add column if not exists limpeza_valor text;
