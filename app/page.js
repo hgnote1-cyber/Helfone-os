@@ -11,16 +11,58 @@ const STATUS = [
   { id: "cancelado", label: "Cancelado", dot: "bg-red-500", border: "border-l-red-500", text: "text-red-400" },
 ];
 
+// Checklist de entrada: marca-se só o que o aparelho TEM (avarias) e o que foi deixado (acessórios).
+// Só os itens marcados saem na impressão.
+const CHECKLIST_AVARIAS = [
+  "Tela quebrada",
+  "Tela trincada",
+  "Tela com riscos",
+  "Manchas / linhas na tela",
+  "Carcaça riscada",
+  "Carcaça amassada",
+  "Traseira quebrada",
+  "Sem tampa traseira",
+  "Câmera quebrada",
+  "Bateria inchada",
+  "Não liga",
+  "Entrou desligado (não testado)",
+  "Molhado / oxidado",
+  "Botão com defeito",
+  "Bloqueado (senha / iCloud / conta Google)",
+  "Já foi aberto antes",
+];
+const CHECKLIST_ACESSORIOS = ["Capa", "Carregador", "Chip", "Cartão de memória", "Caixa"];
 const DEFAULT_CHECKLIST = [
-  "Liga normalmente",
-  "Tela sem trincos",
-  "Bateria ok",
-  "Botões funcionando",
-  "Carcaça sem avarias",
-  "Conector de carga ok",
-  "Câmera ok",
-  "Acessórios entregues (carregador, capa)",
-].map((label, i) => ({ id: `d${i}`, label, checked: false }));
+  ...CHECKLIST_AVARIAS.map((label) => ({ label, grupo: "avaria" })),
+  ...CHECKLIST_ACESSORIOS.map((label) => ({ label, grupo: "acessorio" })),
+].map((c, i) => ({ id: `d${i}`, label: c.label, grupo: c.grupo, checked: false }));
+
+// OS antigas (checklist de "está ok") não têm grupo e continuam imprimindo como antes.
+function checklistTemGrupos(order) {
+  return (order.checklist || []).some((c) => c.grupo);
+}
+
+function checklistMarcados(order, grupo) {
+  return (order.checklist || []).filter((c) => c.checked && (c.grupo || "avaria") === grupo).map((c) => c.label);
+}
+
+function checklistPrintHtml(order, oldLabel) {
+  const list = order.checklist || [];
+  if (!checklistTemGrupos(order)) {
+    const html = list.map((c) => `<div class="item">[${c.checked ? "x" : " "}] ${c.label}</div>`).join("");
+    return `<div class="section"><div class="label">${oldLabel}</div>${html || "-"}</div>`;
+  }
+  const av = checklistMarcados(order, "avaria");
+  const ac = checklistMarcados(order, "acessorio");
+  return (
+    (av.length
+      ? `<div class="section"><div class="label">Avarias / estado na entrada</div><div>${av.join("; ")}</div></div>`
+      : "") +
+    (ac.length
+      ? `<div class="section"><div class="label">Acessórios deixados</div><div>${ac.join("; ")}</div></div>`
+      : "")
+  );
+}
 
 const MAX_PHOTOS = 6;
 
@@ -307,11 +349,26 @@ function buildReceiptText(order, variant) {
   if (order.numero_serie) lines.push(`Serie: ${order.numero_serie}`);
   lines.push(order.defeito || "");
   lines.push(sep);
-  lines.push("CHECKLIST");
-  (order.checklist || []).forEach((c) => {
-    lines.push(`[${c.checked ? "x" : " "}] ${c.label}`);
-  });
-  lines.push(sep);
+  if (!checklistTemGrupos(order)) {
+    lines.push("CHECKLIST");
+    (order.checklist || []).forEach((c) => {
+      lines.push(`[${c.checked ? "x" : " "}] ${c.label}`);
+    });
+    lines.push(sep);
+  } else {
+    const av = checklistMarcados(order, "avaria");
+    const ac = checklistMarcados(order, "acessorio");
+    if (av.length) {
+      lines.push("AVARIAS / ESTADO NA ENTRADA");
+      lines.push(...wrapText(av.join("; "), 32));
+      lines.push(sep);
+    }
+    if (ac.length) {
+      lines.push("ACESSORIOS DEIXADOS");
+      lines.push(...wrapText(ac.join("; "), 32));
+      lines.push(sep);
+    }
+  }
   lines.push(`Orcamento: R$ ${order.orcamento || "-"}`);
   if (order.contato_liquido) {
     lines.push(sep);
@@ -586,9 +643,6 @@ function printCustomerReceipt(order, size = "a4") {
     alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
     return;
   }
-  const checklistHtml = (order.checklist || [])
-    .map((c) => `<div class="item">[${c.checked ? "x" : " "}] ${c.label}</div>`)
-    .join("");
   const dataEntrada = order.created_at
     ? new Date(order.created_at).toLocaleDateString("pt-BR")
     : new Date().toLocaleDateString("pt-BR");
@@ -644,10 +698,7 @@ function printCustomerReceipt(order, size = "a4") {
         <div>${(order.defeito || "-").replace(/\n/g, "<br/>")}</div>
       </div>
 
-      <div class="section">
-        <div class="label">Condição na entrada (checklist)</div>
-        ${checklistHtml || "-"}
-      </div>
+      ${checklistPrintHtml(order, "Condição na entrada (checklist)")}
 
       <div class="section" style="border-bottom:none;">
         <div class="row"><span>Orçamento previsto</span><span>R$ ${order.orcamento || "a definir"}</span></div>
@@ -691,9 +742,6 @@ function printOrder(order, size = "a4") {
     alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
     return;
   }
-  const checklistHtml = (order.checklist || [])
-    .map((c) => `<div class="item">[${c.checked ? "x" : " "}] ${c.label}</div>`)
-    .join("");
   win.document.write(`
     <html>
     <head>
@@ -763,10 +811,7 @@ function printOrder(order, size = "a4") {
           : ""
       }
 
-      <div class="section">
-        <div class="label">Checklist</div>
-        ${checklistHtml || "-"}
-      </div>
+      ${checklistPrintHtml(order, "Checklist")}
 
       <div class="section">
         <div class="row"><span>Orçamento</span><span>R$ ${order.orcamento || "-"}</span></div>
@@ -1582,7 +1627,9 @@ export default function Home() {
     if (!label) return;
     setCurrent({
       ...current,
-      checklist: [...current.checklist, { id: uid(), label, checked: false }],
+      checklist: checklistTemGrupos(current)
+        ? [...current.checklist, { id: uid(), label, grupo: "avaria", custom: true, checked: true }]
+        : [...current.checklist, { id: uid(), label, checked: false }],
     });
     setNewItemLabel("");
   }
@@ -2345,6 +2392,65 @@ export default function Home() {
             )}
           </section>
 
+          {checklistTemGrupos(current) && (
+            <section className="space-y-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">
+                Estado na entrada (toque só no que o aparelho tem)
+              </p>
+              {[
+                { id: "avaria", titulo: "Avarias / estado" },
+                { id: "acessorio", titulo: "Acessórios deixados" },
+              ].map((g) => (
+                <div key={g.id} className="space-y-1.5">
+                  <p className="text-xs text-zinc-600">{g.titulo}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {current.checklist
+                      .filter((c) => (c.grupo || "avaria") === g.id)
+                      .map((item) => (
+                        <span
+                          key={item.id}
+                          className={`inline-flex items-center rounded-full border text-xs ${
+                            item.checked
+                              ? "bg-amber-500 border-amber-500 text-zinc-950 font-medium"
+                              : "bg-zinc-900 border-zinc-700 text-zinc-400"
+                          }`}
+                        >
+                          <button type="button" onClick={() => toggleChecklistItem(item.id)} className="px-2.5 py-1.5">
+                            {item.label}
+                          </button>
+                          {item.custom && (
+                            <button
+                              type="button"
+                              onClick={() => removeChecklistItem(item.id)}
+                              className="pr-2 pl-0.5 opacity-70"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <input
+                  placeholder="Outro (digite e adicione)"
+                  value={newItemLabel}
+                  onChange={(e) => setNewItemLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addChecklistItem()}
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  onClick={addChecklistItem}
+                  className="shrink-0 border border-zinc-700 text-zinc-300 text-sm px-3 rounded-lg"
+                >
+                  Adicionar
+                </button>
+              </div>
+            </section>
+          )}
+
+          {!checklistTemGrupos(current) && (
           <section className="space-y-2">
             <p className="text-xs uppercase tracking-wide text-zinc-500">Checklist de vistoria</p>
             <div className="space-y-1.5">
@@ -2394,6 +2500,7 @@ export default function Home() {
               </button>
             </div>
           </section>
+          )}
 
           <PhotoPicker
             label="Fotos de entrada"
@@ -2849,8 +2956,11 @@ export default function Home() {
           {(() => {
             const renderCard = (o) => {
               const s = statusInfo(o.status);
-              const checkedCount = (o.checklist || []).filter((c) => c.checked).length;
-              const totalCount = (o.checklist || []).length;
+              const novoChecklist = checklistTemGrupos(o);
+              const checkedCount = novoChecklist
+                ? checklistMarcados(o, "avaria").length
+                : (o.checklist || []).filter((c) => c.checked).length;
+              const totalCount = novoChecklist ? checkedCount : (o.checklist || []).length;
               return (
                 <div
                   key={o.id}
@@ -2873,7 +2983,9 @@ export default function Home() {
                     {o.orcamento && <span>Orçamento: R$ {o.orcamento}</span>}
                     {totalCount > 0 && (
                       <span>
-                        Checklist: {checkedCount}/{totalCount}
+                        {novoChecklist
+                          ? `${checkedCount} ${checkedCount === 1 ? "avaria" : "avarias"} na entrada`
+                          : `Checklist: ${checkedCount}/${totalCount}`}
                       </span>
                     )}
                     {(o.entry_photos?.length > 0 || o.exit_photos?.length > 0 || o.docs_assinados?.length > 0) && (
