@@ -8,6 +8,11 @@ export const metadata = {
     icon: "/icon-192.png",
     apple: "/apple-touch-icon.png",
   },
+  openGraph: {
+    title: "Helfone - Ordens de Serviço",
+    description: "Controle de ordens de serviço da Helfone",
+    images: ["/og-image.png"],
+  },
 };
 
 export const viewport = {

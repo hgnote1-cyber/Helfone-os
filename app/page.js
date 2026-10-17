@@ -61,6 +61,11 @@ function emptyOrder() {
     imei_consulta_resultado: "",
     imei_consulta_fotos: [],
     defeito: "",
+    contato_liquido: false,
+    limpeza_valor: "",
+    saida_tipo: "",
+    saida_servicos: "",
+    saida_valor_devido: "",
     senha: "",
     orcamento: "",
     servico: "",
@@ -241,6 +246,45 @@ function storeHeaderHtml() {
   `;
 }
 
+// Quebra um texto em linhas de até `width` colunas, sem acentos (impressora térmica).
+function wrapText(text, width) {
+  const words = String(text)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .split(/\s+/);
+  const lines = [];
+  let cur = "";
+  words.forEach((w) => {
+    if (!cur) cur = w;
+    else if ((cur + " " + w).length <= width) cur += " " + w;
+    else {
+      lines.push(cur);
+      cur = w;
+    }
+  });
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// Termo de limpeza para aparelho que entrou molhado / com contato com líquido.
+function limpezaValorTexto(order) {
+  const v = String(order.limpeza_valor || "").trim();
+  return v ? `R$ ${v}` : "a ser informado pela loja antes do serviço";
+}
+
+function termoLiquidoParagrafos(order) {
+  return [
+    "O cliente declara que o aparelho teve contato com água ou outro líquido.",
+    "Nesse caso é obrigatório, antes de qualquer diagnóstico, fazer a limpeza, secagem e desoxidação da placa, pois não é possível testar um aparelho molhado.",
+    `Esse serviço de limpeza é cobrado à parte, ${
+      String(order.limpeza_valor || "").trim()
+        ? `no valor de R$ ${String(order.limpeza_valor).trim()}`
+        : "em valor a ser informado pela loja antes do serviço"
+    }, e é devido mesmo que o cliente não aprove o orçamento do conserto depois.`,
+    "Após a limpeza a loja informa o diagnóstico e o orçamento do reparo. Líquido pode causar danos progressivos ou irreversíveis, e a loja não garante a recuperação do aparelho.",
+  ];
+}
+
 function buildReceiptText(order, variant) {
   const sep = "--------------------------------";
   const lines = [];
@@ -268,6 +312,15 @@ function buildReceiptText(order, variant) {
   });
   lines.push(sep);
   lines.push(`Orcamento: R$ ${order.orcamento || "-"}`);
+  if (order.contato_liquido) {
+    lines.push(sep);
+    lines.push("APARELHO COM AGUA/LIQUIDO");
+    termoLiquidoParagrafos(order).forEach((p) => {
+      lines.push(...wrapText(p, 32));
+      lines.push("");
+    });
+    lines.pop();
+  }
   if (variant === "interno") {
     lines.push(`Tecnico: ${order.tecnico || "-"}`);
     lines.push(sep);
@@ -275,6 +328,10 @@ function buildReceiptText(order, variant) {
     lines.push(order.obs || "-");
   } else {
     lines.push(sep);
+    if (order.contato_liquido) {
+      lines.push("Ciente e de acordo com a limpeza");
+      lines.push("e sua cobranca.");
+    }
     lines.push("Declaro estar de acordo com os");
     lines.push("dados e orcamento acima.");
     lines.push("");
@@ -381,6 +438,8 @@ function printThermalDirect(order, variant) {
       ? buildPaymentReceiptText(order)
       : variant === "imei"
       ? buildImeiProofText(order)
+      : variant === "entrega"
+      ? buildDeliveryTermText(order)
       : buildReceiptText(order, variant);
   const b64 = btoa(unescape(encodeURIComponent(text)));
   window.location.href = `rawbt:base64,${b64}`;
@@ -552,6 +611,9 @@ function printCustomerReceipt(order, size = "a4") {
         .row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 3px; }
         .item { font-size: 15px; }
         .terms { font-size: 13px; color: #000; margin: 18px 0; line-height: 1.5; }
+        .liquido { border: 2px solid #000; padding: 8px 10px; margin: 14px 0; font-size: 13px; line-height: 1.45; }
+        .liquido-title { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+        .liquido p { margin: 0 0 5px; }
         .sign { margin-top: 40px; }
         .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 14px; text-align: center; }
         ${paperCss(size)}
@@ -590,9 +652,24 @@ function printCustomerReceipt(order, size = "a4") {
         <div class="row"><span>Orçamento previsto</span><span>R$ ${order.orcamento || "a definir"}</span></div>
       </div>
 
+      ${
+        order.contato_liquido
+          ? `<div class="liquido">
+        <div class="liquido-title">APARELHO COM CONTATO COM ÁGUA / LÍQUIDO</div>
+        ${termoLiquidoParagrafos(order)
+          .map((p) => `<p>${p}</p>`)
+          .join("")}
+      </div>`
+          : ""
+      }
+
       <div class="terms">
         Declaro estar de acordo com a descrição do aparelho e do defeito relatado acima,
-        bem como com o orçamento previsto informado pela loja.
+        bem como com o orçamento previsto informado pela loja.${
+          order.contato_liquido
+            ? " Declaro também estar ciente e de acordo com a limpeza do aparelho e com a sua cobrança, conforme o termo acima."
+            : ""
+        }
       </div>
 
       <div class="sign">
@@ -676,6 +753,15 @@ function printOrder(order, size = "a4") {
           : ""
       }
 
+      ${
+        order.contato_liquido
+          ? `<div class="section">
+        <div class="label">Aparelho com contato com água/líquido</div>
+        <div>Limpeza/desoxidação obrigatória antes do diagnóstico. Valor: ${limpezaValorTexto(order)}</div>
+      </div>`
+          : ""
+      }
+
       <div class="section">
         <div class="label">Checklist</div>
         ${checklistHtml || "-"}
@@ -689,6 +775,202 @@ function printOrder(order, size = "a4") {
       <div class="section" style="border-bottom:none;">
         <div class="label">Observações</div>
         <div>${(order.obs || "-").replace(/\n/g, "<br/>")}</div>
+      </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 250);
+}
+
+// ---------- Termo de entrega do aparelho (saída) ----------
+function entregaInfo(order) {
+  const semReparo = order.saida_tipo === "sem_reparo";
+  const rs = (v) => {
+    const t = String(v || "").trim();
+    return t ? `R$ ${t}` : "";
+  };
+  if (semReparo) {
+    const desc =
+      (order.saida_servicos || "").trim() ||
+      (order.contato_liquido
+        ? "Limpeza, secagem e desoxidação (aparelho com líquido)"
+        : "Diagnóstico / serviço executado");
+    const valor = rs(order.saida_valor_devido) || rs(order.limpeza_valor);
+    return {
+      semReparo,
+      linhas: [{ desc, valor: valor || "a informar" }],
+      total: valor || "a informar",
+      orcamento: rs(order.orcamento),
+    };
+  }
+  const { itens, total } = itensComTotal(order);
+  return {
+    semReparo,
+    linhas: itens.map((it) => ({ desc: it.descricao || "Serviço", valor: it.preco ? `R$ ${it.preco}` : "" })),
+    total: total && total !== "-" ? `R$ ${total}` : "-",
+    orcamento: "",
+  };
+}
+
+function entregaParagrafos(order) {
+  if (order.saida_tipo === "sem_reparo") {
+    const p = ["Recebi de volta o aparelho acima descrito, sem reparo, nas condições em que se encontra."];
+    if (order.contato_liquido) {
+      p.push(
+        "O aparelho deu entrada com contato com água/líquido. Para o diagnóstico foi necessário realizar a limpeza, secagem e desoxidação da placa, serviço já executado e indicado acima. O reparo orçado não foi aprovado e, por isso, não foi realizado."
+      );
+      p.push(
+        "A loja não se responsabiliza por falhas, perda de dados ou funções do aparelho decorrentes do dano por líquido anterior à entrada."
+      );
+    } else {
+      p.push("O reparo orçado não foi aprovado e, por isso, não foi realizado. Os serviços já executados estão indicados acima.");
+    }
+    return p;
+  }
+  return [
+    "Recebi o aparelho acima descrito com o reparo concluído, tendo conferido o funcionamento no ato da entrega.",
+    `Garantia de ${order.garantia_dias || "90"} dias contra defeitos de fabricação do serviço/peça. Não cobre mau uso, quedas, umidade ou violação do produto.`,
+  ];
+}
+
+function buildDeliveryTermText(order) {
+  const eq = "================================";
+  const info = entregaInfo(order);
+  const lines = [];
+  lines.push(...storeHeaderLines());
+  lines.push("TERMO DE ENTREGA DO APARELHO");
+  lines.push(eq);
+  const { data: d, hora: h } = formatDateBR(new Date());
+  lines.push(`OS No: ${order.numero}  Saida: ${d} ${h}`);
+  lines.push(`Cliente: ${order.cliente || "Cliente Avulso"}`);
+  if (order.telefone) lines.push(order.telefone);
+  if (order.cpf) lines.push(`CPF: ${order.cpf}`);
+  if (order.cnpj) lines.push(`CNPJ: ${order.cnpj}`);
+  lines.push(eq);
+  lines.push(`Aparelho: ${order.aparelho || "-"}`);
+  if (order.imei) lines.push(`IMEI: ${order.imei}`);
+  if (order.numero_serie) lines.push(`Serie: ${order.numero_serie}`);
+  lines.push(eq);
+  lines.push("SITUACAO NA SAIDA");
+  lines.push(`[${info.semReparo ? " " : "x"}] Entregue com reparo concluido`);
+  if (info.semReparo) {
+    lines.push("[x] Devolvido SEM reparo -");
+    lines.push("    orcamento nao aprovado");
+  } else {
+    lines.push("[ ] Devolvido SEM reparo");
+  }
+  lines.push(eq);
+  lines.push("SERVICOS / VALORES");
+  info.linhas.forEach((l) => {
+    lines.push(...wrapText(l.desc, 32));
+    if (l.valor) lines.push(`   ${l.valor}`);
+  });
+  if (info.semReparo && info.orcamento) {
+    lines.push(`Reparo orcado (nao realizado):`);
+    lines.push(`   ${info.orcamento} - nao cobrado`);
+  }
+  lines.push(`TOTAL A PAGAR: ${info.total}`);
+  lines.push(eq);
+  entregaParagrafos(order).forEach((p) => {
+    lines.push(...wrapText(p, 32));
+    lines.push("");
+  });
+  lines.push("");
+  lines.push("______________________");
+  lines.push("Assinatura do cliente");
+  lines.push("");
+  lines.push("[ ] Cliente recusou-se a assinar");
+  lines.push("");
+  lines.push("______________________");
+  lines.push("Assinatura do atendente");
+  return lines.join("\n");
+}
+
+function printDeliveryTerm(order, size = "a4") {
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("O navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.");
+    return;
+  }
+  const info = entregaInfo(order);
+  const { data: dataStr, hora: horaStr } = formatDateBR(new Date());
+  const linhasHtml = info.linhas
+    .map((l) => `<div class="row"><span>${l.desc}</span><span>${l.valor}</span></div>`)
+    .join("");
+  win.document.write(`
+    <html>
+    <head>
+      <title>OS #${order.numero} - Termo de entrega</title>
+      <meta charset="utf-8" />
+      <style>
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #000; margin: 0; font-weight: normal; }
+        .titulo { text-align: center; font-weight: bold; font-size: 15px; border-top: 1px dashed #333; border-bottom: 1px dashed #333; padding: 6px 0; margin: 10px 0; }
+        .section { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
+        .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; font-weight: 600; }
+        .row { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; margin-bottom: 3px; }
+        .row span:last-child { white-space: nowrap; }
+        .total { font-weight: bold; margin-top: 5px; }
+        .box { border: 2px solid #000; padding: 8px 10px; margin: 12px 0; font-size: 13px; line-height: 1.45; }
+        .box-title { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+        .box p { margin: 0 0 5px; }
+        .sign-line { border-top: 1px solid #111; width: 100%; margin-top: 40px; padding-top: 4px; font-size: 14px; text-align: center; }
+        .recusa { margin-top: 16px; font-size: 14px; }
+        ${paperCss(size)}
+      </style>
+    </head>
+    <body>
+      ${storeHeaderHtml()}
+
+      <div class="titulo">TERMO DE ENTREGA DO APARELHO</div>
+      <div style="text-align:center; margin-bottom:10px;">OS #${order.numero} &middot; Saída em ${dataStr} ${horaStr}</div>
+
+      <div class="section">
+        <div class="label">Cliente</div>
+        <div>${order.cliente || "Cliente Avulso"}</div>
+        ${order.telefone ? `<div>${order.telefone}</div>` : ""}
+        ${order.cpf ? `<div>CPF: ${order.cpf}</div>` : ""}
+        ${order.cnpj ? `<div>CNPJ: ${order.cnpj}</div>` : ""}
+      </div>
+
+      <div class="section">
+        <div class="label">Aparelho</div>
+        <div>${order.aparelho || "-"}</div>
+        ${order.imei ? `<div>IMEI: ${order.imei}</div>` : ""}
+        ${order.numero_serie ? `<div>Nº de série: ${order.numero_serie}</div>` : ""}
+      </div>
+
+      <div class="section">
+        <div class="label">Situação na saída</div>
+        <div>[${info.semReparo ? "&nbsp;&nbsp;" : "x"}] Entregue com o reparo concluído</div>
+        <div${info.semReparo ? ' style="font-weight:bold;"' : ""}>[${info.semReparo ? "x" : "&nbsp;&nbsp;"}] Devolvido SEM reparo — orçamento do reparo não aprovado pelo cliente</div>
+      </div>
+
+      <div class="section">
+        <div class="label">Serviços realizados / valores</div>
+        ${linhasHtml}
+        ${
+          info.semReparo && info.orcamento
+            ? `<div class="row"><span>Reparo orçado em ${info.orcamento} (não realizado)</span><span>não cobrado</span></div>`
+            : ""
+        }
+        <div class="row total"><span>TOTAL A PAGAR</span><span>${info.total}</span></div>
+      </div>
+
+      <div class="box">
+        <div class="box-title">DECLARAÇÃO</div>
+        ${entregaParagrafos(order)
+          .map((p) => `<p>${p}</p>`)
+          .join("")}
+      </div>
+
+      <div class="sign-line">Assinatura do cliente</div>
+
+      <div class="recusa">
+        [&nbsp;&nbsp;] Cliente recusou-se a assinar este termo.
+        <div class="sign-line" style="margin-top:30px;">Assinatura do atendente (Helfone)</div>
       </div>
     </body>
     </html>
@@ -1935,6 +2217,38 @@ export default function Home() {
               rows={3}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500 resize-none"
             />
+            <label
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 border ${
+                current.contato_liquido ? "bg-sky-950/40 border-sky-700" : "bg-zinc-900 border-zinc-800"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setCurrent({ ...current, contato_liquido: !current.contato_liquido })}
+                className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                  current.contato_liquido
+                    ? "bg-sky-500 border-sky-500 text-zinc-950"
+                    : "border-zinc-600 text-transparent"
+                }`}
+              >
+                ✓
+              </button>
+              <span className="flex-1 text-sm text-zinc-300">💧 Aparelho com água / líquido</span>
+            </label>
+            {current.contato_liquido && (
+              <div className="space-y-2">
+                <input
+                  placeholder="Valor da limpeza R$ (deixe vazio para informar depois)"
+                  inputMode="decimal"
+                  value={current.limpeza_valor}
+                  onChange={(e) => setCurrent({ ...current, limpeza_valor: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-sky-500"
+                />
+                <p className="text-xs text-sky-300/80">
+                  A via de entrada vai sair com o termo de limpeza/desoxidação para o cliente assinar.
+                </p>
+              </div>
+            )}
             <input
               placeholder="Senha / padrão de desbloqueio (opcional)"
               value={current.senha}
@@ -2088,6 +2402,46 @@ export default function Home() {
               setCurrent({ ...current, exit_photos: current.exit_photos.filter((_, idx) => idx !== i) })
             }
           />
+
+          <section className="space-y-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Entrega do aparelho (termo de saída)</p>
+            <select
+              value={current.saida_tipo}
+              onChange={(e) => setCurrent({ ...current, saida_tipo: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm"
+            >
+              <option value="">Entregue com reparo concluído</option>
+              <option value="sem_reparo">Devolvido SEM reparo (orçamento não aprovado)</option>
+            </select>
+            {current.saida_tipo === "sem_reparo" && (
+              <div className="space-y-2">
+                <input
+                  placeholder={
+                    current.contato_liquido
+                      ? "Serviço realizado (vazio = limpeza, secagem e desoxidação)"
+                      : "Serviço já realizado (ex: Diagnóstico)"
+                  }
+                  value={current.saida_servicos}
+                  onChange={(e) => setCurrent({ ...current, saida_servicos: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                />
+                <input
+                  placeholder="Valor devido R$ (vazio = valor da limpeza)"
+                  inputMode="decimal"
+                  value={current.saida_valor_devido}
+                  onChange={(e) => setCurrent({ ...current, saida_valor_devido: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setPrintChoice("entrega")}
+              className="w-full border border-zinc-700 text-zinc-200 text-sm py-2.5 rounded-lg"
+            >
+              Imprimir termo de entrega
+            </button>
+          </section>
 
           <section className="space-y-3">
             <p className="text-xs uppercase tracking-wide text-zinc-500">Serviço</p>
@@ -2274,6 +2628,8 @@ export default function Home() {
                       printPaymentReceipt(current, opt.id);
                     } else if (printChoice === "imei") {
                       printImeiProof(current, opt.id);
+                    } else if (printChoice === "entrega") {
+                      printDeliveryTerm(current, opt.id);
                     } else {
                       printCustomerReceipt(current, opt.id);
                     }
@@ -2479,6 +2835,7 @@ export default function Home() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-mono text-xs text-zinc-500">
                       OS #{o.numero} {o.canal === "empresa" && <span className="text-zinc-500">🏢</span>}
+                      {o.contato_liquido && <span title="Aparelho com água/líquido"> 💧</span>}
                     </span>
                     <span className={`text-xs ${s.text}`}>{s.label}</span>
                   </div>

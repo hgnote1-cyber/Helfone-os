@@ -88,3 +88,8 @@ create index if not exists ordens_lote_id_idx on ordens (lote_id) where lote_id 
 -- Aparelho com contato com agua/liquido: termo de limpeza na via de entrada
 alter table ordens add column if not exists contato_liquido boolean default false;
 alter table ordens add column if not exists limpeza_valor text;
+
+-- Termo de entrega (saida) do aparelho
+alter table ordens add column if not exists saida_tipo text;
+alter table ordens add column if not exists saida_servicos text;
+alter table ordens add column if not exists saida_valor_devido text;
