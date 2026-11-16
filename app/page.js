@@ -1286,6 +1286,7 @@ export default function Home() {
   const [deleting, setDeleting] = useState(false);
   const [printChoice, setPrintChoice] = useState(null);
   const [autofillNotice, setAutofillNotice] = useState("");
+  const [clienteSugField, setClienteSugField] = useState(null); // null | "cliente" | "telefone" | "cpf"
   const [showDashboard, setShowDashboard] = useState(false);
   const [pushStatus, setPushStatus] = useState("checking"); // checking | off | on | unsupported
   const [metaFaturamento, setMetaFaturamento] = useState("");
@@ -1612,6 +1613,81 @@ export default function Home() {
       });
       await load();
     } catch (e) {}
+  }
+
+  // Clientes recorrentes: tira da lista de OS já salvas (a mais recente de cada cliente vem primeiro).
+  function sugestoesCliente(field) {
+    if (current?.id) return [];
+    const norm = (t) =>
+      String(t || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+    const query = field === "cliente" ? current.cliente : field === "telefone" ? current.telefone : current.cpf;
+    const qDigits = String(query || "").replace(/\D/g, "");
+    const qText = norm(query);
+    if (field === "cliente" ? qText.length < 2 : qDigits.length < 3) return [];
+
+    const map = new Map();
+    (orders || []).forEach((o) => {
+      const nome = (o.cliente || "").trim();
+      if (!nome) return;
+      const tel = (o.telefone || "").replace(/\D/g, "");
+      const key = tel || (o.cpf || "").replace(/\D/g, "") || (o.cnpj || "").replace(/\D/g, "") || norm(nome);
+      if (!map.has(key)) {
+        map.set(key, { cliente: nome, telefone: o.telefone || "", cpf: o.cpf || "", cnpj: o.cnpj || "", total: 0, aparelho: o.aparelho || "" });
+      }
+      const c = map.get(key);
+      c.total += 1;
+      if (!c.telefone && o.telefone) c.telefone = o.telefone;
+      if (!c.cpf && o.cpf) c.cpf = o.cpf;
+      if (!c.cnpj && o.cnpj) c.cnpj = o.cnpj;
+    });
+
+    return [...map.values()]
+      .filter((c) => {
+        if (field === "cliente") return norm(c.cliente).includes(qText);
+        if (field === "telefone") return c.telefone.replace(/\D/g, "").includes(qDigits);
+        return c.cpf.replace(/\D/g, "").includes(qDigits) || c.cnpj.replace(/\D/g, "").includes(qDigits);
+      })
+      .filter((c) => !(norm(c.cliente) === norm(current.cliente) && c.telefone === current.telefone && c.cpf === current.cpf))
+      .slice(0, 5);
+  }
+
+  function escolherCliente(c) {
+    setCurrent({ ...current, cliente: c.cliente, telefone: c.telefone, cpf: c.cpf, cnpj: c.cnpj });
+    setAutofillNotice(c.cliente);
+    setClienteSugField(null);
+  }
+
+  function renderSugestoes(field) {
+    if (clienteSugField !== field) return null;
+    const lista = sugestoesCliente(field);
+    if (lista.length === 0) return null;
+    return (
+      <div className="absolute z-20 left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+        <p className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-zinc-500">Cliente já cadastrado</p>
+        {lista.map((c, i) => (
+          <button
+            key={i}
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              escolherCliente(c);
+            }}
+            className="w-full text-left px-3 py-2 border-t border-zinc-800 active:bg-zinc-800"
+          >
+            <span className="block text-sm text-zinc-100">{c.cliente}</span>
+            <span className="block text-xs text-zinc-500">
+              {[c.telefone, c.cpf || c.cnpj].filter(Boolean).join(" · ")}
+              {` · ${c.total} OS`}
+              {c.aparelho ? ` · último: ${c.aparelho}` : ""}
+            </span>
+          </button>
+        ))}
+      </div>
+    );
   }
 
   function toggleChecklistItem(itemId) {
@@ -2129,16 +2205,28 @@ export default function Home() {
 
           <section className="space-y-3">
             <p className="text-xs uppercase tracking-wide text-zinc-500">Cliente</p>
+            <div className="relative">
             <input
               placeholder="Nome do cliente"
               value={current.cliente}
-              onChange={(e) => setCurrent({ ...current, cliente: e.target.value })}
+              onFocus={() => setClienteSugField("cliente")}
+              onBlur={() => setTimeout(() => setClienteSugField((f) => (f === "cliente" ? null : f)), 150)}
+              onChange={(e) => {
+                setClienteSugField("cliente");
+                setCurrent({ ...current, cliente: e.target.value });
+              }}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
+            {renderSugestoes("cliente")}
+            </div>
+            <div className="relative">
             <input
               placeholder="Telefone (com DDD) — exterior: +código do país"
               value={current.telefone}
+              onFocus={() => setClienteSugField("telefone")}
+              onBlur={() => setTimeout(() => setClienteSugField((f) => (f === "telefone" ? null : f)), 150)}
               onChange={(e) => {
+                setClienteSugField("telefone");
                 const value = e.target.value;
                 let updated = { ...current, telefone: value };
                 if (!current.id) {
@@ -2157,16 +2245,26 @@ export default function Home() {
               }}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
+            {renderSugestoes("telefone")}
+            </div>
             {autofillNotice && (
               <p className="text-xs text-emerald-400">Cliente reconhecido: {autofillNotice}</p>
             )}
+            <div className="relative">
             <input
               placeholder="CPF (opcional)"
               inputMode="numeric"
               value={current.cpf}
-              onChange={(e) => setCurrent({ ...current, cpf: formatCpf(e.target.value) })}
+              onFocus={() => setClienteSugField("cpf")}
+              onBlur={() => setTimeout(() => setClienteSugField((f) => (f === "cpf" ? null : f)), 150)}
+              onChange={(e) => {
+                setClienteSugField("cpf");
+                setCurrent({ ...current, cpf: formatCpf(e.target.value) });
+              }}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
+            {renderSugestoes("cpf")}
+            </div>
             <input
               placeholder="CNPJ (opcional, se for empresa)"
               inputMode="numeric"
