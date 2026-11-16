@@ -186,14 +186,20 @@ function formatCnpj(value) {
 }
 
 function normalizePhoneBR(raw) {
-  let digits = (raw || "").replace(/\D/g, "");
+  const text = (raw || "").trim();
+  let digits = text.replace(/\D/g, "");
   if (!digits) return "";
+  // Número internacional: com "+" na frente (ou prefixo 00) vale o código de país digitado.
+  if (text.startsWith("+")) return digits;
+  if (digits.startsWith("00")) return digits.replace(/^0+/, "");
   if (digits.startsWith("0")) {
     digits = digits.replace(/^0+/, "");
   }
   if (digits.startsWith("55") && digits.length > 11) {
     return digits;
   }
+  // Número brasileiro tem no máximo 11 dígitos (DDD + 9 dígitos); mais que isso já traz código de país.
+  if (digits.length >= 12) return digits;
   return `55${digits}`;
 }
 
@@ -2130,7 +2136,7 @@ export default function Home() {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm placeholder-zinc-600 focus:outline-none focus:border-amber-500"
             />
             <input
-              placeholder="Telefone (com DDD)"
+              placeholder="Telefone (com DDD) — exterior: +código do país"
               value={current.telefone}
               onChange={(e) => {
                 const value = e.target.value;
